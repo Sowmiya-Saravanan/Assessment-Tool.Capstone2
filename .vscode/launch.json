@@ -8,6 +8,17 @@
             "mainClass": "com.assessmenttool.assessment_tool_api.AssessmentToolApiApplication",
             "projectName": "assessment-tool-api",
             "args": "",
+            "envFile": "${workspaceFolder}/.env",
+            "vmArgs": " -Dcom.sun.management.jmxremote"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-AssessmentToolApplication<assessment_tool>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.assessmenttool.assessment_tool_mvc.assessment_tool.AssessmentToolApplication",
+            "projectName": "assessment_tool",
+            "args": "",
             "envFile": "${workspaceFolder}/.env"
         }
     ]
