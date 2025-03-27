@@ -20,6 +20,16 @@
             "projectName": "assessment_tool",
             "args": "",
             "envFile": "${workspaceFolder}/.env"
+        },
+        {
+            "type": "java",
+            "name": "Spring Boot-AssessmentToolMvcApplication<assessment_tool>",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "mainClass": "com.assessmenttool.assessment_tool_mvc.AssessmentToolMvcApplication",
+            "projectName": "assessment_tool",
+            "args": "",
+            "envFile": "${workspaceFolder}/.env"
         }
     ]
 }
