@@ -9,4 +9,5 @@ public class AssessmentToolApiApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(AssessmentToolApiApplication.class, args);
 	}
+
 }

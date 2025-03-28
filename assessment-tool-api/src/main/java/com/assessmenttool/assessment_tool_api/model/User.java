@@ -1,12 +1,11 @@
 package com.assessmenttool.assessment_tool_api.model;
 
-import java.time.LocalDateTime;
-
 import jakarta.persistence.*;
 import lombok.Data;
 
 import java.time.LocalDateTime;
 import java.util.List;
+
 @Entity
 @Table(name = "users")
 @Data
@@ -49,7 +48,4 @@ public class User {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
     }
-
 }
-
-

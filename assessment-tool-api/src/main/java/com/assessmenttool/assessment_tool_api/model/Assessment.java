@@ -35,6 +35,10 @@ public class Assessment {
     @JoinColumn(name = "educator_id", nullable = false)
     private User educator;
 
+    @ManyToOne
+    @JoinColumn(name = "category_id")
+    private Category category; // Added previously
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
@@ -61,16 +65,4 @@ public class Assessment {
             status = AssessmentStatus.DRAFT;
         }
     }
-}
-
-enum AssessmentType {
-    QUIZ, TEST, EXAM, SURVEY
-}
-
-enum DurationType {
-    TOTAL, PER_QUESTION
-}
-
-enum AssessmentStatus {
-    DRAFT, ASSIGNED, ONGOING, FINISHED, CANCELED
 }
