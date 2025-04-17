@@ -51,7 +51,8 @@ public class Class {
     @JoinTable(
         name = "class_students",
         joinColumns = @JoinColumn(name = "class_id"),
-        inverseJoinColumns = @JoinColumn(name = "student_id")
+        inverseJoinColumns = @JoinColumn(name = "student_id"),
+        uniqueConstraints = @UniqueConstraint(columnNames = {"class_id", "student_id"})
     )
     private List<User> students = new ArrayList<>();
 }
