@@ -1,0 +1,2 @@
+-- INSERT INTO assesscraft.users (email, password, firstName, lastName, role, createdAt, updatedAt) VALUES
+-- ('educator1@example.com', '$2a$10$JADNXyL01rueJkWbkNXMxuyJxgy0gIRN6nk/O4yrY9f4H0zZ.N68e', 'John', 'Doe', 'EDUCATOR', '2025-04-15 00:00:00', '2025-04-15 00:00:00'),
