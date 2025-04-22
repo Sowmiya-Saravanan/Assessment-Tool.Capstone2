@@ -27,10 +27,16 @@ public class Invitation {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private InvitationStatus status = InvitationStatus.PENDING;
+    private InvitationStatus status = InvitationStatus.SENT; // Changed default to SENT
+
+    @Column
+    private String temporaryPassword; // Add this for the generated password
 
     @Column(updatable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @Column
+    private LocalDateTime expirationDate; // Added for cleanup (optional but recommended)
 }

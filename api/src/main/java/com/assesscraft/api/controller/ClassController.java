@@ -3,6 +3,7 @@ package com.assesscraft.api.controller;
 import com.assesscraft.api.model.Class;
 import com.assesscraft.api.model.ClassStatus;
 import com.assesscraft.api.model.Invitation;
+import com.assesscraft.api.model.InvitationStatus;
 import com.assesscraft.api.model.User;
 import com.assesscraft.api.security.CustomUserDetails;
 import com.assesscraft.api.service.ClassService;
@@ -69,10 +70,7 @@ public class ClassController {
         }
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
-        List<Class> activeClasses = classService.findByEducatorAndStatus(
-            userDetails.getUser(), 
-            ClassStatus.ACTIVE
-        );
+        List<Class> activeClasses = classService.findByEducatorAndStatus(userDetails.getUser(), ClassStatus.ACTIVE);
         List<Map<String, Object>> response = activeClasses.stream().map(cls -> {
             Map<String, Object> map = new HashMap<>();
             map.put("classId", cls.getClassId());
@@ -85,8 +83,8 @@ public class ClassController {
         return new ResponseEntity<>(response, HttpStatus.OK);
     }
 
-    @GetMapping("/class/{classId}/pending-students")
-    public ResponseEntity<List<Invitation>> getPendingStudents(@PathVariable Long classId, Authentication authentication) {
+    @GetMapping("/class/{classId}/sent-invitations")
+    public ResponseEntity<List<Invitation>> getSentInvitations(@PathVariable Long classId, Authentication authentication) {
         if (authentication == null || authentication.getPrincipal() == null) {
             return new ResponseEntity<>(HttpStatus.UNAUTHORIZED);
         }
@@ -98,8 +96,8 @@ public class ClassController {
             return new ResponseEntity<>(HttpStatus.FORBIDDEN);
         }
 
-        List<Invitation> pendingStudents = classService.getPendingStudents(classId);
-        return new ResponseEntity<>(pendingStudents, HttpStatus.OK);
+        List<Invitation> sentInvitations = classService.getSentInvitations(classId);
+        return new ResponseEntity<>(sentInvitations, HttpStatus.OK);
     }
 
     @PostMapping("/class/{classId}/approve-students")
@@ -192,7 +190,7 @@ public class ClassController {
             return new ResponseEntity<>(Map.of("message", "Email is required"), HttpStatus.BAD_REQUEST);
         }
 
-        classService.addStudent(classId, email); // Updated to use service method directly
+        classService.addStudent(classId, email);
         return new ResponseEntity<>(Map.of("message", "Student added successfully"), HttpStatus.OK);
     }
 
@@ -214,7 +212,7 @@ public class ClassController {
             return new ResponseEntity<>(Map.of("message", "Email is required"), HttpStatus.BAD_REQUEST);
         }
 
-        classService.removeStudent(classId, email); // Updated to use email
+        classService.removeStudent(classId, email);
         return new ResponseEntity<>(Map.of("message", "Student removed successfully"), HttpStatus.OK);
     }
 

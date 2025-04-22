@@ -7,11 +7,18 @@ import com.assesscraft.api.repository.ClassRepository;
 import com.assesscraft.api.repository.InvitationRepository;
 import com.assesscraft.api.repository.UserRepository;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 @RestController
 @RequestMapping("/api")
 public class InviteController {
@@ -22,7 +29,7 @@ public class InviteController {
     private final UserRepository userRepository;
 
     public InviteController(JavaMailSender mailSender, ClassRepository classRepository,
-                            InvitationRepository invitationRepository, UserRepository userRepository) {
+                           InvitationRepository invitationRepository, UserRepository userRepository) {
         this.mailSender = mailSender;
         this.classRepository = classRepository;
         this.invitationRepository = invitationRepository;
@@ -38,6 +45,7 @@ public class InviteController {
         public String[] getEmails() { return emails; }
         public void setEmails(String[] emails) { this.emails = emails; }
     }
+    private static final Logger logger = LoggerFactory.getLogger(InviteController.class); // Added logger initialization
 
     @PostMapping("/invitations")
     public ResponseEntity<?> sendInvites(@RequestBody InviteRequest request) {
@@ -49,12 +57,15 @@ public class InviteController {
             return ResponseEntity.status(403).body("Not authorized to invite for this class");
         }
 
+        Map<String, String> failures = new HashMap<>();
         for (String email : request.getEmails()) {
             Invitation invite = new Invitation();
             invite.setClassEntity(classEntity);
             invite.setEmail(email);
             invite.setClassCode(classEntity.getClassCode());
-            invite.setStatus(InvitationStatus.PENDING);
+            invite.setStatus(InvitationStatus.SENT); // Initial state, updated after email
+            invite.setCreatedAt(LocalDateTime.now());
+            invite.setExpirationDate(LocalDateTime.now().plusDays(7)); // Set expiration
             invitationRepository.save(invite);
 
             SimpleMailMessage message = new SimpleMailMessage();
@@ -66,9 +77,22 @@ public class InviteController {
             message.setText("You're invited to join " + classEntity.getClassName() +
                     "\nUse code: " + classEntity.getClassCode() +
                     "\nOr join here: " + joinLink);
-            mailSender.send(message);
+            try {
+                mailSender.send(message);
+                logger.info("Email sent successfully to: {}", email);
+                // Status remains SENT if email succeeds
+            } catch (MailException e) {
+                failures.put(email, e.getMessage());
+                invite.setStatus(InvitationStatus.EXPIRED); // Mark as expired on failure
+                invitationRepository.save(invite);
+                logger.error("Failed to send email to {}: {}", email, e.getMessage());
+            }
         }
 
-        return ResponseEntity.ok("Invites sent");
+        if (failures.isEmpty()) {
+            return ResponseEntity.ok("Invites sent");
+        } else {
+            return ResponseEntity.ok(Map.of("message", "Some invites sent with failures", "failures", failures));
+        }
     }
 }

@@ -10,4 +10,5 @@ public interface AssessmentRepository extends JpaRepository<Assessment, Long> {
     long countByClassEntityIn(List<Class> classes);
     List<Assessment> findByClassEntityIn(List<Class> classes);
     List<Assessment> findByClassEntityInAndStartTimeAfter(List<Class> classes, LocalDateTime startTime);
+    List<Assessment> findByCreatedBy(String createdBy);
 }
