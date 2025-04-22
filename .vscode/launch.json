@@ -2,51 +2,32 @@
     "configurations": [
         {
             "type": "java",
-            "name": "AssessmentToolApiApplication",
+            "name": "PasswordHash",
             "request": "launch",
-            "mainClass": "com.assessment_tool.assessment_tool_api.AssessmentToolApiApplication",
-            "projectName": ""
+            "mainClass": "com.assesscraft.api.util.PasswordHash",
+            "projectName": "api"
         },
         {
             "type": "java",
-            "name": "Spring Boot-AssessmentToolApiApplication<assessment-tool-api>",
+            "name": "Spring Boot-MvcApplication<mvc>",
             "request": "launch",
             "cwd": "${workspaceFolder}",
-            "mainClass": "com.assessmenttool.assessment_tool_api.AssessmentToolApiApplication",
-            "projectName": "assessment-tool-api",
+            "mainClass": "com.assesscraft.mvc.MvcApplication",
+            "projectName": "mvc",
             "args": "",
             "envFile": "${workspaceFolder}/.env",
-            "vmArgs": " -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=50297 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dspring.jmx.enabled=true -Djava.rmi.server.hostname=localhost -Dspring.application.admin.enabled=true -Dspring.boot.project.name=assessment-tool-api"
+            "vmArgs": " -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=64487 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dspring.jmx.enabled=true -Djava.rmi.server.hostname=localhost -Dspring.application.admin.enabled=true -Dspring.boot.project.name=mvc"
         },
         {
             "type": "java",
-            "name": "Spring Boot-AssessmentToolApplication<assessment_tool>",
+            "name": "Spring Boot-ApiApplication<api>",
             "request": "launch",
             "cwd": "${workspaceFolder}",
-            "mainClass": "com.assessmenttool.assessment_tool_mvc.assessment_tool.AssessmentToolApplication",
-            "projectName": "assessment_tool",
+            "mainClass": "com.assesscraft.api.ApiApplication",
+            "projectName": "api",
             "args": "",
-            "envFile": "${workspaceFolder}/.env"
-        },
-        {
-            "type": "java",
-            "name": "Spring Boot-AssessmentToolMvcApplication<assessment_tool>",
-            "request": "launch",
-            "cwd": "${workspaceFolder}",
-            "mainClass": "com.assessmenttool.assessment_tool_mvc.AssessmentToolMvcApplication",
-            "projectName": "assessment_tool",
-            "args": "",
-            "envFile": "${workspaceFolder}/.env"
-        },
-        {
-            "type": "java",
-            "name": "Spring Boot-AssessmentToolApiApplication<assessment_tool_api>",
-            "request": "launch",
-            "cwd": "${workspaceFolder}",
-            "mainClass": "com.assessment_tool.assessment_tool_api.AssessmentToolApiApplication",
-            "projectName": "assessment_tool_api",
-            "args": "",
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/.env",
+            "vmArgs": " -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=49816 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Dspring.jmx.enabled=true -Djava.rmi.server.hostname=localhost -Dspring.application.admin.enabled=true -Dspring.boot.project.name=api"
         }
     ]
 }
