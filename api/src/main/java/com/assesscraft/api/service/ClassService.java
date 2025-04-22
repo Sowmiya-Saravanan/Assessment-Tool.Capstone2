@@ -79,20 +79,15 @@ public class ClassService {
                 .filter(user -> user.getRole() == Role.STUDENT)
                 .toList();
         classEntity.getStudents().addAll(students);
-        if (classEntity.getStatus() == ClassStatus.DRAFT && !students.isEmpty()) {
-            classEntity.setStatus(ClassStatus.ACTIVE);
-            classEntity.setUpdatedAt(LocalDateTime.now());
-        }
+        updateClassStatusIfNeeded(classEntity, students);
         classRepository.save(classEntity);
     }
 
     @Transactional(readOnly = true)
-    public List<Invitation> getPendingStudents(Long classId) {
+    public List<Invitation> getSentInvitations(Long classId) {
         Class classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new RuntimeException("Class not found"));
-        return classEntity.getInvitations().stream()
-                .filter(inv -> inv.getStatus() == InvitationStatus.PENDING)
-                .toList();
+        return invitationRepository.findAllByClassEntityAndStatus(classEntity, InvitationStatus.SENT);
     }
 
     @Transactional
@@ -101,49 +96,45 @@ public class ClassService {
                 .orElseThrow(() -> new RuntimeException("Class not found"));
         List<Invitation> invitations = invitationRepository.findAllById(invitationIds)
                 .stream()
-                .filter(inv -> inv.getClassEntity().getClassId().equals(classId) && inv.getStatus() == InvitationStatus.PENDING)
+                .filter(inv -> inv.getClassEntity().getClassId().equals(classId))
                 .toList();
 
         if (invitations.isEmpty()) {
-            logger.warn("No valid pending invitations found for class {}", classId);
+            logger.warn("No valid invitations found for class {}", classId);
             return;
         }
 
         List<User> students = new ArrayList<>();
         for (Invitation invitation : invitations) {
             Optional<User> userOpt = userRepository.findByEmail(invitation.getEmail());
-            if (userOpt.isPresent() && userOpt.get().getRole() == Role.STUDENT) {
-                students.add(userOpt.get());
-                invitation.setStatus(InvitationStatus.ACCEPTED);
-                invitationRepository.save(invitation);
-            } else {
-                logger.warn("User not found or not a student for invitation: {}", invitation.getEmail());
-            }
+            userOpt.ifPresent(user -> {
+                if (user.getRole() == Role.STUDENT) {
+                    students.add(user);
+                } else {
+                    logger.warn("User not a student for invitation: {}", invitation.getEmail());
+                }
+            });
         }
 
         classEntity.getStudents().addAll(students);
-        if (classEntity.getStatus() == ClassStatus.DRAFT && !students.isEmpty()) {
-            classEntity.setStatus(ClassStatus.ACTIVE);
-            classEntity.setUpdatedAt(LocalDateTime.now());
-        }
+        updateClassStatusIfNeeded(classEntity, students);
         classRepository.save(classEntity);
     }
-
+    
     @Transactional
     public Map<String, Object> bulkAssignStudents(Long classId, MultipartFile file) {
         Class classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new RuntimeException("Class not found"));
-
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || (!originalFilename.endsWith(".xlsx") && !originalFilename.endsWith(".xls"))) {
+    
+        if (!file.getOriginalFilename().endsWith(".xlsx") && !file.getOriginalFilename().endsWith(".xls")) {
             throw new RuntimeException("Only Excel files (.xlsx or .xls) are allowed");
         }
-
+    
         Map<String, Object> result = new HashMap<>();
         List<String> invalidEmails = new ArrayList<>();
         List<String> emailFailures = new ArrayList<>();
         List<User> addedStudents = new ArrayList<>();
-
+    
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
             Sheet sheet = workbook.getSheetAt(0);
             List<String> emails = new ArrayList<>();
@@ -157,8 +148,9 @@ public class ClassService {
                     logger.warn("Invalid email format skipped: {}", email);
                 }
             }
-            emails = emails.stream().distinct().collect(Collectors.toList()); // Deduplicate emails
-
+            emails = emails.stream().distinct().collect(Collectors.toList());
+    
+            // Process students and invitations
             for (String email : emails) {
                 Optional<User> userOpt = userRepository.findByEmail(email);
                 User user;
@@ -172,82 +164,74 @@ public class ClassService {
                     user = new User();
                     user.setEmail(email);
                     user.setRole(Role.STUDENT);
-                    user.setPassword(UUID.randomUUID().toString().substring(0, 8));
+                    user.setPassword(UUID.randomUUID().toString().substring(0, 8)); // To be hashed
                     user = userRepository.save(user);
-                    logger.info("Created new student: {}", email);
-
-                    Invitation existingInvite = invitationRepository.findByEmailAndClassEntity(email, classEntity)
-                            .orElse(null);
-                    if (existingInvite == null || existingInvite.getStatus() != InvitationStatus.PENDING) {
-                        Invitation invite = new Invitation();
-                        invite.setClassEntity(classEntity);
-                        invite.setEmail(email);
-                        invite.setClassCode(classEntity.getClassCode());
-                        invite.setStatus(InvitationStatus.PENDING);
-                        invite.setCreatedAt(LocalDateTime.now());
-                        classEntity.getInvitations().add(invite);
-                        invitationRepository.save(invite);
-                        logger.info("Created invitation for unregistered student: {}", email);
-                    }
+                    logger.info("Created new student: {} with temp password", email);
                 }
+    
+                // Check and handle invitation
+                Invitation existingInvite = invitationRepository.findByEmailAndClassEntity(email, classEntity)
+                        .orElse(null);
+                if (existingInvite == null) {
+                    Invitation invite = new Invitation();
+                    invite.setClassEntity(classEntity);
+                    invite.setEmail(email);
+                    invite.setClassCode(classEntity.getClassCode());
+                    invite.setStatus(InvitationStatus.SENT);
+                    invite.setTemporaryPassword(UUID.randomUUID().toString().substring(0, 8));
+                    invite.setCreatedAt(LocalDateTime.now());
+                    invite.setExpirationDate(LocalDateTime.now().plusDays(7));
+                    try {
+                        invitationRepository.save(invite);
+                        classEntity.getInvitations().add(invite);
+                        logger.info("Created new invitation for: {}", email);
+                    } catch (DataIntegrityViolationException e) {
+                        logger.warn("Duplicate invitation detected for {} in class {}, skipping", email, classId);
+                        continue; // Skip to next email if duplicate
+                    }
+                } else {
+                    logger.info("Existing invitation found for {} in class {}, reusing", email, classId);
+                }
+    
                 if (!classEntity.getStudents().contains(user)) {
                     classEntity.getStudents().add(user);
                     addedStudents.add(user);
                     logger.debug("Added student {} to class {}", email, classId);
                 } else {
-                    logger.info("Student {} already associated with class {}, skipping addition", email, classId);
-                }
-
-                String classCode = classEntity.getClassCode();
-                String subject = "Class Code for " + classEntity.getClassName();
-                String registrationUrl = "http://localhost:8081/student/register?email=" + email + "&code=" + classCode;
-
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setTo(email);
-                message.setSubject(subject);
-
-                try {
-                    if (userOpt.isPresent() && userOpt.get().getRole() == Role.STUDENT) {
-                        message.setText("Hello,\n\nYour class code for " + classEntity.getClassName() + " is: " + classCode + "\n\nJoin using this code on the student portal.\n\nBest,\nAssessCraft Team");
-                    } else {
-                        message.setText("Hello,\n\nYou have been invited to join " + classEntity.getClassName() + ".\nPlease register using this link: " + registrationUrl + "\n\nBest,\nAssessCraft Team");
-                    }
-                    mailSender.send(message);
-                    logger.info("Email sent successfully to: {}", email);
-                } catch (MailException e) {
-                    emailFailures.add(email + ": " + e.getMessage());
-                    logger.error("Failed to send email to {}: {}", email, e.getMessage());
+                    logger.info("Student {} already in class {}, skipping addition", email, classId);
                 }
             }
-
-            try {
-                classRepository.save(classEntity);
-                if (classEntity.getStatus() == ClassStatus.DRAFT && !classEntity.getStudents().isEmpty()) {
-                    classEntity.setStatus(ClassStatus.ACTIVE);
-                    classEntity.setUpdatedAt(LocalDateTime.now());
-                    classRepository.save(classEntity);
-                    logger.info("Class {} status updated to ACTIVE after adding students", classId);
-                }
-            } catch (DataIntegrityViolationException e) {
-                logger.warn("Duplicate student-class association detected for class {}, skipping: {}", classId, e.getMessage());
+    
+            // Update status and save
+            updateClassStatusIfNeeded(classEntity, addedStudents);
+            classRepository.save(classEntity);
+            logger.debug("Class {} status after save: {}", classId, classEntity.getStatus());
+    
+            // Send emails (non-transactional)
+            for (String email : emails) {
+                Optional<User> userOpt = userRepository.findByEmail(email);
+                if (userOpt.isPresent() && userOpt.get().getRole() != Role.STUDENT) continue;
+    
+                Invitation invite = invitationRepository.findByEmailAndClassEntity(email, classEntity)
+                        .orElseThrow(() -> new RuntimeException("Invitation not found for " + email));
+                sendInvitationEmail(classEntity, userOpt.orElse(null), invite.getTemporaryPassword());
             }
-
+    
             if (!invalidEmails.isEmpty()) result.put("invalidEmails", invalidEmails);
             if (!emailFailures.isEmpty()) result.put("emailFailures", emailFailures);
             if (!addedStudents.isEmpty()) result.put("addedStudents", addedStudents.size());
             return result;
-
         } catch (IOException e) {
-            throw new RuntimeException("Failed to process Excel file: " + e.getMessage());
+            throw new RuntimeException("Failed to process Excel file: " + e.getMessage(), e);
         }
     }
-
     @Transactional
     public void addStudent(Long classId, String email) {
         Class classEntity = classRepository.findById(classId)
                 .orElseThrow(() -> new RuntimeException("Class not found"));
         Optional<User> userOpt = userRepository.findByEmail(email);
         User user;
+        String tempPassword = null;
 
         if (userOpt.isPresent()) {
             user = userOpt.get();
@@ -258,53 +242,35 @@ public class ClassService {
             user = new User();
             user.setEmail(email);
             user.setRole(Role.STUDENT);
-            user.setPassword(UUID.randomUUID().toString().substring(0, 8));
+            tempPassword = UUID.randomUUID().toString().substring(0, 8);
+            user.setPassword(tempPassword); // Should be hashed in UserService
             user = userRepository.save(user);
-            logger.info("Created new student: {}", email);
+            logger.info("Created new student: {} with password: {}", email, tempPassword);
 
             Invitation existingInvite = invitationRepository.findByEmailAndClassEntity(email, classEntity)
                     .orElse(null);
-            if (existingInvite == null || existingInvite.getStatus() != InvitationStatus.PENDING) {
+            if (existingInvite == null) {
                 Invitation invite = new Invitation();
                 invite.setClassEntity(classEntity);
                 invite.setEmail(email);
                 invite.setClassCode(classEntity.getClassCode());
-                invite.setStatus(InvitationStatus.PENDING); // Fixed to use enum
+                invite.setStatus(InvitationStatus.SENT);
+                invite.setTemporaryPassword(tempPassword);
                 invite.setCreatedAt(LocalDateTime.now());
+                invite.setExpirationDate(LocalDateTime.now().plusDays(7));
                 classEntity.getInvitations().add(invite);
-                saveInvitation(invite); // Use new method
+                saveInvitation(invite);
                 logger.info("Created invitation for unregistered student: {}", email);
             }
         }
 
         if (!classEntity.getStudents().contains(user)) {
             classEntity.getStudents().add(user);
-            if (classEntity.getStatus() == ClassStatus.DRAFT) {
-                classEntity.setStatus(ClassStatus.ACTIVE);
-                classEntity.setUpdatedAt(LocalDateTime.now());
-            }
+            updateClassStatusIfNeeded(classEntity, List.of(user));
             classRepository.save(classEntity);
             logger.info("Added student {} to class {}", email, classId);
 
-            // Send email
-            String classCode = classEntity.getClassCode();
-            String subject = "Class Code for " + classEntity.getClassName();
-            String registrationUrl = "http://localhost:8081/student/register?email=" + email + "&code=" + classCode;
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setTo(email);
-            message.setSubject(subject);
-            if (userOpt.isPresent() && userOpt.get().getRole() == Role.STUDENT) {
-                message.setText("Hello,\n\nYour class code for " + classEntity.getClassName() + " is: " + classCode + "\n\nJoin using this code on the student portal.\n\nBest,\nAssessCraft Team");
-            } else {
-                message.setText("Hello,\n\nYou have been invited to join " + classEntity.getClassName() + ".\nPlease register using this link: " + registrationUrl + "\n\nBest,\nAssessCraft Team");
-            }
-            try {
-                mailSender.send(message);
-                logger.info("Email sent successfully to: {}", email);
-            } catch (MailException e) {
-                logger.error("Failed to send email to {}: {}", email, e.getMessage());
-                throw new RuntimeException("Failed to send invitation email: " + e.getMessage());
-            }
+            sendInvitationEmail(classEntity, user, tempPassword);
         } else {
             logger.info("Student {} already associated with class {}, skipping addition", email, classId);
         }
@@ -356,5 +322,47 @@ public class ClassService {
     @Transactional
     public Invitation saveInvitation(Invitation invitation) {
         return invitationRepository.save(invitation);
+    }
+
+    private void updateClassStatusIfNeeded(Class classEntity, List<User> students) {
+        if (classEntity.getStatus() == ClassStatus.DRAFT && !students.isEmpty()) {
+            classEntity.setStatus(ClassStatus.ACTIVE);
+            classEntity.setUpdatedAt(LocalDateTime.now());
+            logger.info("Class {} status updated to ACTIVE after adding students", classEntity.getClassId());
+        }
+    }
+
+    private void sendInvitationEmail(Class classEntity, User user, String tempPassword) {
+        String email = user.getEmail();
+        String classCode = classEntity.getClassCode();
+        String subject = "Class Invitation for " + classEntity.getClassName();
+        String registrationUrl = "http://localhost:8081/student/register?email=" + email + "&code=" + classCode;
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(email);
+        message.setSubject(subject);
+        try {
+            Invitation invite = classEntity.getInvitations().stream()
+                    .filter(i -> i.getEmail().equals(email))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Invitation not found for " + email));
+            String passwordToSend = (user.getRole() == Role.STUDENT && userRepository.findByEmail(email).isPresent()) ? null : tempPassword;
+            if (passwordToSend != null) {
+                message.setText("Hello,\n\nYou have been invited to join " + classEntity.getClassName() + ".\n" +
+                        "Please register using this link: " + registrationUrl + "\n" +
+                        "Temporary password: " + passwordToSend + "\n" +
+                        "You can change it after logging in.\n\nBest,\nAssessCraft Team");
+            } else {
+                message.setText("Hello,\n\nYour class code for " + classEntity.getClassName() + " is: " + classCode + "\n\nJoin using this code on the student portal.\n\nBest,\nAssessCraft Team");
+            }
+            mailSender.send(message);
+            logger.info("Email sent successfully to: {}", email);
+        } catch (MailException e) {
+            logger.error("Failed to send email to {}: {}", email, e.getMessage());
+            Invitation failedInvite = invitationRepository.findByEmailAndClassEntity(email, classEntity)
+                    .orElseThrow(() -> new RuntimeException("Invitation not found"));
+            failedInvite.setStatus(InvitationStatus.EXPIRED);
+            invitationRepository.save(failedInvite);
+            throw new RuntimeException("Failed to send invitation email: " + e.getMessage());
+        }
     }
 }

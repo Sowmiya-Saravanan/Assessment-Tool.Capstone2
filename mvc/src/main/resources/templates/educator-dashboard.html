@@ -90,26 +90,62 @@
         .alert {
             margin-top: 10px;
         }
-        .class-list {
+        .class-list, .assessment-list {
             margin-top: 20px;
         }
-        .class-item {
+        .class-item, .assessment-item {
             padding: 10px;
             border-bottom: 1px solid #eee;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
-        .class-item .class-info {
+        .class-item .class-info, .assessment-item .assessment-info {
             flex-grow: 1;
         }
-        .class-item .button-group {
+        .class-item .button-group, .assessment-item .button-group {
             display: flex;
-            gap: 10px; /* Space between buttons */
+            gap: 10px;
             align-items: center;
         }
         .tab-content {
             margin-top: 10px;
+        }
+        .question-block {
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--primary-color);
+            position: relative;
+        }
+        .question-number {
+            position: absolute;
+            top: -10px;
+            left: -10px;
+            background-color: var(--primary-color);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+        .option-block {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .option-block .input-group-text {
+            width: 40px;
+            text-align: center;
+        }
+        .keyword-block {
+            display: flex;
+            align-items: center;
+            margin-bottom: 10px;
         }
         @media (max-width: 768px) {
             .sidebar {
@@ -120,11 +156,11 @@
             .content {
                 margin-left: 0;
             }
-            .class-item {
+            .class-item, .assessment-item {
                 flex-direction: column;
                 gap: 10px;
             }
-            .class-item .button-group {
+            .class-item .button-group, .assessment-item .button-group {
                 flex-direction: row;
                 width: 100%;
                 justify-content: flex-end;
@@ -138,7 +174,7 @@
         <a href="#" id="create-class-link"><i class="fas fa-chalkboard"></i> Create Class</a>
         <a href="#" id="class-tabs-link"><i class="fas fa-list"></i> Classes</a>
         <a href="#" id="manage-students-link"><i class="fas fa-users"></i> Manage Students</a>
-        <a href="#" id="create-assessment-link"><i class="fas fa-file-alt"></i> Create Assessment</a>
+        <a href="#" id="manage-assessments-link"><i class="fas fa-file-alt"></i> Manage Assessments</a>
         <a href="#" th:href="@{/educator/logout}"><i class="fas fa-sign-out-alt"></i> Logout</a>
     </div>
     <div class="content">
@@ -268,33 +304,26 @@
                 <div class="modal-dialog">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title" id="manageStudentsModalLabel">Manage Students for Class</h5>
+                            <h3 class="modal-title" id="manageStudentsModalLabel">Sent Invitations for Class</h3>
                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
                         <div class="modal-body">
                             <ul class="nav nav-tabs" id="studentTabs" role="tablist">
                                 <li class="nav-item" role="presentation">
-                                    <button class="nav-link active" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">Pending Students</button>
+                                    <button class="nav-link active" id="sent-invitations-tab" data-bs-toggle="tab" data-bs-target="#sent-invitations" type="button" role="tab">Sent Invitations</button>
                                 </li>
                                 <li class="nav-item" role="presentation">
                                     <button class="nav-link" id="bulk-tab" data-bs-toggle="tab" data-bs-target="#bulk" type="button" role="tab">Bulk Import</button>
                                 </li>
                             </ul>
                             <div class="tab-content" id="studentTabsContent">
-                                <!-- Pending Students Tab -->
-                                <div class="tab-pane fade show active" id="pending" role="tabpanel">
-                                    <h6>Pending Students</h6>
-                                    <div th:if="${pendingStudents}">
-                                        <div th:each="student, iter : ${pendingStudents}" class="mb-2">
-                                            <input type="checkbox" th:value="${student.invitationId}" th:id="'pendingStudent' + ${iter.index}" name="pendingStudentIds">
-                                            <label th:for="'pendingStudent' + ${iter.index}" th:text="${student.email}"></label>
-                                            <button type="button" class="btn btn-danger btn-sm float-end" th:onclick="'removeStudent(' + ${selectedClassId} + ', \'' + ${student.email} + '\')'">Remove</button>
-                                        </div>
-                                        <button type="button" class="btn btn-primary mt-2" th:onclick="'approveStudents(' + ${selectedClassId} + ')'">Approve Selected</button>
-                                    </div>
-                                    <p th:unless="${pendingStudents}" class="mt-2">No pending students.</p>
+                                <!-- Sent Invitations Tab -->
+                                <div class="tab-pane fade show active" id="sent-invitations" role="tabpanel">
+                                    <h6>Sent Invitations</h6>
+                                    <div id="pending"></div> <!-- Populated dynamically by JavaScript -->
+                                    <p id="noInvitations" style="display: none;">No sent invitations found.</p>
                                 </div>
-                                <!-- Bulk Import Tab -->
+                                <!-- Bulk Import Tab (unchanged) -->
                                 <div class="tab-pane fade" id="bulk" role="tabpanel">
                                     <h6>Bulk Import Students</h6>
                                     <form id="bulkImportForm" th:action="@{/educator/class/{classId}/bulk-students}" method="post" enctype="multipart/form-data">
@@ -332,15 +361,237 @@
 
         <div id="manage-students-section" class="content-section">
             <h3>Manage Students</h3>
-            <p>Functionality to add students via Excel or email will be added here.</p>
+            <p>Students under specific educator will be displayed </p>
         </div>
 
-        <div id="create-assessment-section" class="content-section">
-            <h3>Create Assessment</h3>
-            <p>Assessment creation form will be added here.</p>
+        <div id="manage-assessments-section" class="content-section">
+            <h3>Manage Assessments</h3>
+            <ul class="nav nav-tabs" id="assessmentTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="create-assessment-tab" data-bs-toggle="tab" data-bs-target="#create-assessment" type="button" role="tab">Create Assessment</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="manage-categories-tab" data-bs-toggle="tab" data-bs-target="#manage-categories" type="button" role="tab">Manage Categories</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="view-assessments-tab" data-bs-toggle="tab" data-bs-target="#view-assessments" type="button" role="tab">View Assessments</button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="assign-assessment-tab" data-bs-toggle="tab" data-bs-target="#assign-assessment" type="button" role="tab">Assign to Class</button>
+                </li>
+            </ul>
+            <div class="tab-content" id="assessmentTabsContent">
+                <!-- Create Assessment Tab -->
+                <div class="tab-pane fade show active" id="create-assessment" role="tabpanel">
+                    <h4>Create New Assessment</h4>
+                    <form th:action="@{/educator/assessment/create}" method="post" th:object="${assessment}" id="assessmentForm" class="needs-validation" novalidate>
+                        <!-- Assessment Details Section -->
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Title <span class="text-danger">*</span></label>
+                            <input type="text" class="form-control" id="title" th:field="*{title}" required placeholder="e.g., Java Fundamentals Quiz">
+                            <div class="invalid-feedback">Please provide a title for the assessment.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="description" class="form-label">Description</label>
+                            <textarea class="form-control" id="description" th:field="*{description}" rows="3" placeholder="e.g., Answer all questions, correct answers will be given points as indicated."></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="type" class="form-label">Assessment Type <span class="text-danger">*</span></label>
+                            <select class="form-control" id="type" th:field="*{type}" required>
+                                <option value="" selected disabled>Select Type</option>
+                                <option value="QUIZ">Quiz</option>
+                                <option value="TEST">Test</option>
+                                <option value="EXAM">Exam</option>
+                            </select>
+                            <div class="invalid-feedback">Please select an assessment type.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="durationMinutes" class="form-label">Duration (minutes) <span class="text-danger">*</span></label>
+                            <input type="number" class="form-control" id="durationMinutes" th:field="*{durationMinutes}" min="1" required>
+                            <div class="invalid-feedback">Please specify a duration.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="startTime" class="form-label">Start Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="startTime" th:field="*{startTime}" required>
+                            <div class="invalid-feedback">Please specify a start time.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="endTime" class="form-label">End Time <span class="text-danger">*</span></label>
+                            <input type="datetime-local" class="form-control" id="endTime" th:field="*{endTime}" required>
+                            <div class="invalid-feedback">Please specify an end time.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="gradingMode" class="form-label">Grading Mode <span class="text-danger">*</span></label>
+                            <select class="form-control" id="gradingMode" th:field="*{gradingMode}" required>
+                                <option value="AUTO">Auto</option>
+                                <option value="MANUAL">Manual</option>
+                                <option value="HYBRID">Hybrid</option>
+                            </select>
+                            <div class="invalid-feedback">Please select a grading mode.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="categoryId" class="form-label">Category <span class="text-danger">*</span></label>
+                            <select class="form-control" id="categoryId" th:field="*{categoryId}" required>
+                                <option value="" disabled selected>Select Category</option>
+                                <option th:each="cat : ${categories}" th:value="${cat.categoryId}" th:text="${cat.name}"></option>
+                            </select>
+                            <div class="invalid-feedback">Please select a category.</div>
+                        </div>
+
+                        <!-- Questions Section -->
+                        <div class="mb-3">
+                            <h4 class="mt-4">Questions</h4>
+                            <div id="questions">
+                                <div class="question-block" th:each="question, stat : *{questions}" th:id="'questionBlock' + ${stat.index}">
+                                    <div class="question-number" th:text="${stat.count}">1</div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Question Text <span class="text-danger">*</span></label>
+                                        <textarea th:field="*{questions[__${stat.index}__].content}" class="form-control" required></textarea>
+                                        <div class="invalid-feedback">Please enter the question text.</div>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label class="form-label">Question Type <span class="text-danger">*</span></label>
+                                        <select th:field="*{questions[__${stat.index}__].type}" class="form-control question-type" required onchange="updateQuestionFields(this)">
+                                            <option value="" selected disabled>Select Type</option>
+                                            <option value="MCQ">MCQ</option>
+                                            <option value="TRUE_FALSE">True/False</option>
+                                            <option value="SHORT_ANSWER">Short Answer</option>
+                                            <option value="ESSAY">Essay</option>
+                                            <option value="CODING">Coding</option>
+                                        </select>
+                                        <div class="invalid-feedback">Please select a question type.</div>
+                                    </div>
+                                    <div class="mb-3 points-field">
+                                        <label class="form-label">Points <span class="text-danger">*</span></label>
+                                        <input type="number" th:field="*{questions[__${stat.index}__].maxScore}" class="form-control" min="1" value="1" required>
+                                        <div class="invalid-feedback">Please specify points.</div>
+                                    </div>
+                                    <div class="specific-fields"></div>
+                                    <div class="text-end mt-3">
+                                        <button type="button" class="btn btn-danger" th:onclick="'removeQuestion(' + ${stat.index} + ')'">
+                                            <i class="fas fa-trash me-1"></i> Remove Question
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-center mt-3">
+                                <button type="button" class="btn btn-primary" onclick="addQuestion()">
+                                    <i class="fas fa-plus me-1"></i> Add Question
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="text-end mt-4">
+                            <a th:href="@{/educator/dashboard}" class="btn btn-secondary me-2">
+                                <i class="fas fa-times me-1"></i> Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save me-1"></i> Save as Draft
+                            </button>
+                        </div>
+                    </form>
+                    <div class="alert alert-danger" th:if="${error}" th:text="${error}" role="alert"></div>
+                </div>
+                <!-- Manage Categories Tab -->
+                <div class="tab-pane fade" id="manage-categories" role="tabpanel">
+                    <h4>Manage Categories</h4>
+                    <form th:action="@{/educator/create-category}" method="post">
+                        <div class="mb-3">
+                            <label for="categoryName" class="form-label">Category Name</label>
+                            <input type="text" class="form-control" id="categoryName" name="name" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Create Category</button>
+                    </form>
+                    <div class="alert alert-danger" th:if="${error}" th:text="${error}" role="alert"></div>
+                    <div class="alert alert-success" th:if="${success}" th:text="${success}" role="alert"></div>
+                </div>
+                <!-- View Assessments Tab -->
+                <div class="tab-pane fade" id="view-assessments" role="tabpanel">
+                    <h4>Your Assessments</h4>
+                    <ul class="nav nav-tabs" id="assessmentStatusTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="all-assessments-tab" data-bs-toggle="tab" data-bs-target="#all-assessments" type="button" role="tab">All</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="drafted-assessments-tab" data-bs-toggle="tab" data-bs-target="#drafted-assessments" type="button" role="tab">Drafted</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="active-assessments-tab" data-bs-toggle="tab" data-bs-target="#active-assessments" type="button" role="tab">Active</button>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="assessmentStatusTabsContent">
+                        <!-- All Assessments -->
+                        <div class="tab-pane fade show active" id="all-assessments" role="tabpanel">
+                            <div class="assessment-list" th:if="${assessments}">
+                                <div th:each="assessment, iter : ${assessments}" class="assessment-item">
+                                    <div class="assessment-info">
+                                        <strong th:text="${assessment.title}"></strong> (Type: <span th:text="${assessment.type}"></span>, Status: <span th:text="${assessment.status}"></span>)
+                                    </div>
+                                    <div class="button-group">
+                                        <button type="button" class="btn btn-secondary btn-sm" th:onclick="'viewAssessment(' + ${assessment.assessmentId} + ')'">View</button>
+                                        <button type="button" class="btn btn-danger btn-sm" th:onclick="'deleteAssessment(' + ${assessment.assessmentId} + ')'">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <p th:unless="${assessments}" class="mt-3">No assessments found.</p>
+                        </div>
+                        <!-- Drafted Assessments -->
+                        <div class="tab-pane fade" id="drafted-assessments" role="tabpanel">
+                            <div class="assessment-list" th:if="${assessments}">
+                                <div th:each="assessment, iter : ${assessments}" th:if="${assessment.status} == 'DRAFT'" class="assessment-item">
+                                    <div class="assessment-info">
+                                        <strong th:text="${assessment.title}"></strong> (Type: <span th:text="${assessment.type}"></span>)
+                                    </div>
+                                    <div class="button-group">
+                                        <button type="button" class="btn btn-secondary btn-sm" th:onclick="'viewAssessment(' + ${assessment.assessmentId} + ')'">View</button>
+                                        <button type="button" class="btn btn-danger btn-sm" th:onclick="'deleteAssessment(' + ${assessment.assessmentId} + ')'">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <p th:unless="${assessments}" class="mt-3">No drafted assessments found.</p>
+                        </div>
+                        <!-- Active Assessments -->
+                        <div class="tab-pane fade" id="active-assessments" role="tabpanel">
+                            <div class="assessment-list" th:if="${assessments}">
+                                <div th:each="assessment, iter : ${assessments}" th:if="${assessment.status} == 'ASSIGNED'" class="assessment-item">
+                                    <div class="assessment-info">
+                                        <strong th:text="${assessment.title}"></strong> (Type: <span th:text="${assessment.type}"></span>, Starts: <span th:text="${#temporals.format(assessment.startTime, 'yyyy-MM-dd HH:mm')}"></span>)
+                                    </div>
+                                    <div class="button-group">
+                                        <button type="button" class="btn btn-secondary btn-sm" th:onclick="'viewAssessment(' + ${assessment.assessmentId} + ')'">View</button>
+                                        <button type="button" class="btn btn-danger btn-sm" th:onclick="'deleteAssessment(' + ${assessment.assessmentId} + ')'">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <p th:unless="${assessments}" class="mt-3">No active assessments found.</p>
+                        </div>
+                    </div>
+                </div>
+                <!-- Assign to Class Tab -->
+                <div class="tab-pane fade" id="assign-assessment" role="tabpanel">
+                    <h4>Assign Assessment to Class</h4>
+                    <form th:action="@{/educator/assessment/assign}" method="post">
+                        <div class="mb-3">
+                            <label for="assessmentId" class="form-label">Assessment</label>
+                            <select class="form-control" id="assessmentId" name="assessmentId" required>
+                                <option th:each="assessment : ${assessments}" th:value="${assessment.assessmentId}" th:text="${assessment.title}"></option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="classId" class="form-label">Class</label>
+                            <select class="form-control" id="classId" name="classId" required>
+                                <option th:each="cls : ${activeClasses}" th:value="${cls.classId}" th:text="${cls.className}"></option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Assign</button>
+                    </form>
+                    <div class="alert alert-danger" th:if="${error}" th:text="${error}" role="alert"></div>
+                    <div class="alert alert-success" th:if="${success}" th:text="${success}" role="alert"></div>
+                </div>
+            </div>
         </div>
     </div>
-
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', function() {
@@ -349,7 +600,7 @@
                 'create-class-link': 'create-class-section',
                 'class-tabs-link': 'class-tabs-section',
                 'manage-students-link': 'manage-students-section',
-                'create-assessment-link': 'create-assessment-section'
+                'manage-assessments-link': 'manage-assessments-section'
             };
             Object.entries(sections).forEach(([linkId, sectionId]) => {
                 const link = document.getElementById(linkId);
@@ -363,10 +614,14 @@
                     console.warn(`Link with ID ${linkId} not found in DOM`);
                 }
             });
-
-            // Handle manage students button
+    
+            // Function to get token from session storage
+            function getToken() {
+                return sessionStorage.getItem('token') || '';
+            }
+    
+            // Manage Students Modal (Updated to handle sent invitations)
             window.manageStudents = function(classId) {
-                console.log("Managing students for classId:", classId);
                 if (!classId || isNaN(classId)) {
                     document.getElementById('manageError').textContent = 'Invalid class ID';
                     document.getElementById('manageError').style.display = 'block';
@@ -375,68 +630,39 @@
                 window.selectedClassId = classId;
                 const bulkClassIdInput = document.getElementById('bulkClassId');
                 if (bulkClassIdInput) bulkClassIdInput.value = classId;
-                if (bulkImportForm) {
-                    bulkImportForm.action = `/educator/class/${classId}/bulk-students`;
-                }
-                fetch('/educator/dashboard/pending-students?classId=' + classId, {
-                    headers: {
-                        'Authorization': 'Bearer ' + getToken()
-                    }
+                if (bulkImportForm) bulkImportForm.action = `/educator/class/${classId}/bulk-students`;
+                const modal = new bootstrap.Modal(document.getElementById('manageStudentsModal'));
+                document.getElementById('manageStudentsModalLabel').textContent = `Sent Invitations for Class #${classId}`;
+                fetch('/educator/dashboard/sent-invitations?classId=' + classId, {
+                    headers: { 'Authorization': 'Bearer ' + getToken() }
                 })
                 .then(response => response.json())
                 .then(data => {
-                    if (data) {
-                        const pendingDiv = document.getElementById('pending');
-                        pendingDiv.innerHTML = '';
-                        data.forEach((student, index) => {
+                    const pendingDiv = document.getElementById('pending');
+                    pendingDiv.innerHTML = '';
+                    if (data && data.length > 0) {
+                        data.forEach((invitation, index) => {
                             const div = document.createElement('div');
                             div.className = 'mb-2';
-                            div.innerHTML = `<input type="checkbox" value="${student.invitationId}" id="pendingStudent${index}" name="pendingStudentIds"> <label for="pendingStudent${index}">${student.email}</label> <button type="button" class="btn btn-danger btn-sm float-end" onclick="removeStudent(${classId}, '${student.email}')">Remove</button>`;
+                            div.innerHTML = `
+                                <p>${invitation.email} (Status: ${invitation.status}, Created: ${new Date(invitation.createdAt).toLocaleString()}, Expires: ${new Date(invitation.expirationDate).toLocaleString()})</p>
+                                <button type="button" class="btn btn-danger btn-sm float-end" th:onclick="'removeStudent(' + ${classId} + ', \'' + ${invitation.email} + '\')'">Remove</button>
+                            `;
                             pendingDiv.appendChild(div);
                         });
+                    } else {
+                        pendingDiv.innerHTML = '<p>No sent invitations found.</p>';
                     }
-                    const modal = new bootstrap.Modal(document.getElementById('manageStudentsModal'));
                     modal.show();
                 })
                 .catch(error => {
-                    document.getElementById('manageError').textContent = 'Error fetching pending students: ' + error.message;
+                    document.getElementById('manageError').textContent = 'Error fetching sent invitations: ' + error.message;
                     document.getElementById('manageError').style.display = 'block';
+                    modal.show();
                 });
             };
-
-            // Handle approve students
-            window.approveStudents = function(classId) {
-                const studentIds = Array.from(document.querySelectorAll('#pending input:checked')).map(cb => cb.value);
-                if (studentIds.length === 0) {
-                    document.getElementById('manageError').textContent = 'No students selected for approval';
-                    document.getElementById('manageError').style.display = 'block';
-                    return;
-                }
-                fetch(`/educator/class/${classId}/approve-students`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + getToken()
-                    },
-                    body: JSON.stringify(studentIds)
-                })
-                .then(response => {
-                    if (response.ok) {
-                        window.location.href = '/educator/dashboard?success=Students approved successfully!';
-                    } else {
-                        return response.json().then(error => {
-                            document.getElementById('manageError').textContent = error.message || 'Failed to approve students';
-                            document.getElementById('manageError').style.display = 'block';
-                        });
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('manageError').textContent = 'Error: ' + error.message;
-                    document.getElementById('manageError').style.display = 'block';
-                });
-            };
-
-            // Handle remove student
+    
+            // Remove Student
             window.removeStudent = function(classId, email) {
                 if (confirm(`Are you sure you want to remove ${email} from the class?`)) {
                     fetch(`/educator/class/${classId}/remove-student`, {
@@ -463,15 +689,13 @@
                     });
                 }
             };
-
-            // Handle delete class
+    
+            // Delete Class
             window.deleteClass = function(classId) {
                 if (confirm(`Are you sure you want to delete this class? This action cannot be undone.`)) {
                     fetch(`/educator/class/${classId}`, {
                         method: 'DELETE',
-                        headers: {
-                            'Authorization': 'Bearer ' + getToken()
-                        }
+                        headers: { 'Authorization': 'Bearer ' + getToken() }
                     })
                     .then(response => {
                         if (response.ok) {
@@ -489,14 +713,14 @@
                     });
                 }
             };
-
-            // Handle view students
+    
+            // View Students Modal
             window.viewStudents = function(classId) {
                 console.log("Viewing students for classId:", classId);
+                const modal = new bootstrap.Modal(document.getElementById('viewStudentsModal'));
+                document.getElementById('viewStudentsModalLabel').textContent = `Students for Class #${classId}`;
                 fetch(`/educator/class/${classId}/students`, {
-                    headers: {
-                        'Authorization': 'Bearer ' + getToken()
-                    }
+                    headers: { 'Authorization': 'Bearer ' + getToken() }
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -512,61 +736,57 @@
                     } else {
                         studentsList.innerHTML = '<p>No students found.</p>';
                     }
-                    const modal = new bootstrap.Modal(document.getElementById('viewStudentsModal'));
                     modal.show();
                 })
                 .catch(error => {
                     document.getElementById('manageError').textContent = 'Error fetching students: ' + error.message;
                     document.getElementById('manageError').style.display = 'block';
+                    modal.show();
                 });
             };
-
-            // Handle add student to class
+    
+            // Add Student to Class
             window.addStudentToClass = function(classId) {
                 document.getElementById('addClassIdActive').value = classId;
                 const modal = new bootstrap.Modal(document.getElementById('addStudentModal'));
+                document.getElementById('addErrorActive').style.display = 'none';
                 modal.show();
-            };
-
-            // Handle add student form submission for active classes
-            document.getElementById('addStudentFormActive').addEventListener('submit', function(event) {
-                event.preventDefault();
-                const classId = document.getElementById('addClassIdActive').value;
-                const email = document.getElementById('studentEmailActive').value;
-                const formData = new FormData();
-                formData.append('classId', classId);
-                formData.append('email', email);
-
-                fetch(`/educator/class/${classId}/add-student`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + getToken()
-                    },
-                    body: formData
-                })
-                .then(response => {
-                    if (response.ok) {
-                        window.location.href = '/educator/dashboard?success=Student added successfully!';
-                    } else {
-                        return response.json().then(error => {
-                            document.getElementById('addErrorActive').textContent = error.message || 'Failed to add student';
-                            document.getElementById('addErrorActive').style.display = 'block';
-                        });
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('addErrorActive').textContent = 'Error: ' + error.message;
-                    document.getElementById('addErrorActive').style.display = 'block';
+    
+                document.getElementById('addStudentFormActive').addEventListener('submit', function(event) {
+                    event.preventDefault();
+                    const email = document.getElementById('studentEmailActive').value;
+                    const formData = new FormData();
+                    formData.append('classId', classId);
+                    formData.append('email', email);
+    
+                    fetch(`/educator/class/${classId}/add-student`, {
+                        method: 'POST',
+                        headers: { 'Authorization': 'Bearer ' + getToken() },
+                        body: formData
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            window.location.href = '/educator/dashboard?success=Student added successfully!';
+                        } else {
+                            return response.json().then(error => {
+                                document.getElementById('addErrorActive').textContent = error.message || 'Failed to add student';
+                                document.getElementById('addErrorActive').style.display = 'block';
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        document.getElementById('addErrorActive').textContent = 'Error: ' + error.message;
+                        document.getElementById('addErrorActive').style.display = 'block';
+                    });
                 });
-            });
-
-            // Handle remove students from class
+            };
+    
+            // Remove Students from Class
             window.removeStudentsFromClass = function(classId) {
                 document.getElementById('removeClassId').value = classId;
+                const modal = new bootstrap.Modal(document.getElementById('removeStudentsModal'));
                 fetch(`/educator/class/${classId}/students`, {
-                    headers: {
-                        'Authorization': 'Bearer ' + getToken()
-                    }
+                    headers: { 'Authorization': 'Bearer ' + getToken() }
                 })
                 .then(response => response.json())
                 .then(data => {
@@ -582,49 +802,47 @@
                     } else {
                         studentsToRemove.innerHTML = '<p>No students found.</p>';
                     }
-                    const modal = new bootstrap.Modal(document.getElementById('removeStudentsModal'));
                     modal.show();
                 })
                 .catch(error => {
                     document.getElementById('removeError').textContent = 'Error fetching students: ' + error.message;
                     document.getElementById('removeError').style.display = 'block';
+                    modal.show();
+                });
+    
+                document.getElementById('confirmRemove').addEventListener('click', function() {
+                    const studentEmails = Array.from(document.querySelectorAll('#studentsToRemove input:checked')).map(cb => cb.value);
+                    if (studentEmails.length === 0) {
+                        document.getElementById('removeError').textContent = 'No students selected for removal';
+                        document.getElementById('removeError').style.display = 'block';
+                        return;
+                    }
+                    fetch(`/educator/class/${classId}/remove-students`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': 'Bearer ' + getToken()
+                        },
+                        body: JSON.stringify(studentEmails)
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            window.location.href = '/educator/dashboard?success=Students removed successfully!';
+                        } else {
+                            return response.json().then(error => {
+                                document.getElementById('removeError').textContent = error.message || 'Failed to remove students';
+                                document.getElementById('removeError').style.display = 'block';
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        document.getElementById('removeError').textContent = 'Error: ' + error.message;
+                        document.getElementById('removeError').style.display = 'block';
+                    });
                 });
             };
-
-            // Handle confirm remove students
-            document.getElementById('confirmRemove').addEventListener('click', function() {
-                const classId = document.getElementById('removeClassId').value;
-                const studentEmails = Array.from(document.querySelectorAll('#studentsToRemove input:checked')).map(cb => cb.value);
-                if (studentEmails.length === 0) {
-                    document.getElementById('removeError').textContent = 'No students selected for removal';
-                    document.getElementById('removeError').style.display = 'block';
-                    return;
-                }
-                fetch(`/educator/class/${classId}/remove-students`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': 'Bearer ' + getToken()
-                    },
-                    body: JSON.stringify(studentEmails)
-                })
-                .then(response => {
-                    if (response.ok) {
-                        window.location.href = '/educator/dashboard?success=Students removed successfully!';
-                    } else {
-                        return response.json().then(error => {
-                            document.getElementById('removeError').textContent = error.message || 'Failed to remove students';
-                            document.getElementById('removeError').style.display = 'block';
-                        });
-                    }
-                })
-                .catch(error => {
-                    document.getElementById('removeError').textContent = 'Error: ' + error.message;
-                    document.getElementById('removeError').style.display = 'block';
-                });
-            });
-
-            // Handle bulk import
+    
+            // Bulk Import Form Submission
             const bulkImportForm = document.getElementById('bulkImportForm');
             if (bulkImportForm) {
                 bulkImportForm.addEventListener('submit', function(event) {
@@ -633,9 +851,7 @@
                     const formData = new FormData(bulkImportForm);
                     fetch(`/educator/class/${classId}/bulk-students`, {
                         method: 'POST',
-                        headers: {
-                            'Authorization': 'Bearer ' + getToken()
-                        },
+                        headers: { 'Authorization': 'Bearer ' + getToken() },
                         body: formData
                     })
                     .then(response => {
@@ -654,10 +870,299 @@
                     });
                 });
             }
-
-            function getToken() {
-                return sessionStorage.getItem('token') || '';
-            }
+    
+            // Handle view assessment
+            window.viewAssessment = function(assessmentId) {
+                console.log("Viewing assessment for assessmentId:", assessmentId);
+                window.location.href = `/educator/assessment/${assessmentId}`;
+            };
+    
+            // Handle delete assessment
+            window.deleteAssessment = function(assessmentId) {
+                if (confirm(`Are you sure you want to delete this assessment? This action cannot be undone.`)) {
+                    fetch(`/educator/assessment/${assessmentId}`, {
+                        method: 'DELETE',
+                        headers: { 'Authorization': 'Bearer ' + getToken() }
+                    })
+                    .then(response => {
+                        if (response.ok) {
+                            window.location.href = '/educator/dashboard?success=Assessment deleted successfully!';
+                        } else {
+                            return response.json().then(error => {
+                                document.getElementById('manageError').textContent = error.message || 'Failed to delete assessment';
+                                document.getElementById('manageError').style.display = 'block';
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        document.getElementById('manageError').textContent = 'Error: ' + error.message;
+                        document.getElementById('manageError').style.display = 'block';
+                    });
+                }
+            };
+    
+            // Form validation
+            (() => {
+                'use strict';
+                const forms = document.querySelectorAll('.needs-validation');
+                Array.from(forms).forEach(form => {
+                    form.addEventListener('submit', event => {
+                        if (!form.checkValidity()) {
+                            event.preventPropagation();
+                            event.stopPropagation();
+                        }
+                        form.classList.add('was-validated');
+                    }, false);
+                });
+            })();
+    
+            let questionCount = document.querySelectorAll('#questions .question-block').length;
+    
+            window.addQuestion = function() {
+                const questionsDiv = document.getElementById('questions');
+                const newBlock = document.createElement('div');
+                newBlock.className = 'question-block';
+                newBlock.id = `questionBlock${questionCount}`;
+                newBlock.innerHTML = `
+                    <div class="question-number">${questionCount + 1}</div>
+                    <div class="mb-3">
+                        <label class="form-label">Question Text <span class="text-danger">*</span></label>
+                        <textarea name="questions[${questionCount}].content" class="form-control" required></textarea>
+                        <div class="invalid-feedback">Please enter the question text.</div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Question Type <span class="text-danger">*</span></label>
+                        <select name="questions[${questionCount}].type" class="form-control question-type" required onchange="updateQuestionFields(this)">
+                            <option value="" selected disabled>Select Type</option>
+                            <option value="MCQ">MCQ</option>
+                            <option value="TRUE_FALSE">True/False</option>
+                            <option value="SHORT_ANSWER">Short Answer</option>
+                            <option value="ESSAY">Essay</option>
+                            <option value="CODING">Coding</option>
+                        </select>
+                        <div class="invalid-feedback">Please select a question type.</div>
+                    </div>
+                    <div class="mb-3 points-field">
+                        <label class="form-label">Points <span class="text-danger">*</span></label>
+                        <input type="number" name="questions[${questionCount}].maxScore" class="form-control" min="1" value="1" required>
+                        <div class="invalid-feedback">Please specify points.</div>
+                    </div>
+                    <div class="specific-fields"></div>
+                    <div class="text-end mt-3">
+                        <button type="button" class="btn btn-danger" onclick="removeQuestion(${questionCount})">
+                            <i class="fas fa-trash me-1"></i> Remove Question
+                        </button>
+                    </div>
+                `;
+                questionsDiv.appendChild(newBlock);
+                questionCount++;
+                newBlock.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            };
+    
+            window.removeQuestion = function(index) {
+                const questionBlock = document.getElementById(`questionBlock${index}`);
+                if (questionBlock) {
+                    const questionsDiv = document.getElementById('questions');
+                    questionBlock.remove();
+                    const questionBlocks = questionsDiv.querySelectorAll('.question-block');
+                    questionBlocks.forEach((block, newIndex) => {
+                        block.id = `questionBlock${newIndex}`;
+                        block.querySelector('.question-number').textContent = newIndex + 1;
+                        const textArea = block.querySelector('textarea');
+                        const typeSelect = block.querySelector('select');
+                        const pointsInput = block.querySelector('.points-field input');
+                        const specificFields = block.querySelector('.specific-fields');
+                        textArea.name = `questions[${newIndex}].content`;
+                        typeSelect.name = `questions[${newIndex}].type`;
+                        pointsInput.name = `questions[${newIndex}].maxScore`;
+                        if (specificFields && specificFields.innerHTML !== '') {
+                            const type = typeSelect.value;
+                            if (type === 'MCQ') {
+                                renumberOptions(specificFields.querySelector('.mcq-fields'), newIndex);
+                            } else if (type === 'SHORT_ANSWER' || type === 'ESSAY') {
+                                renumberKeywords(specificFields.querySelector('.keyword-fields'), newIndex);
+                            }
+                        }
+                    });
+                    questionCount = questionBlocks.length;
+                }
+            };
+    
+            window.updateQuestionFields = function(select) {
+                const block = select.closest('.question-block');
+                const specificFields = block.querySelector('.specific-fields');
+                const pointsField = block.querySelector('.points-field input');
+                specificFields.innerHTML = '';
+                pointsField.disabled = false;
+    
+                const questionIndex = block.querySelector('textarea').name.split('[')[1].split(']')[0];
+                const type = select.value;
+    
+                if (type === 'MCQ') {
+                    specificFields.innerHTML = `
+                        <div class="mcq-fields mt-3">
+                            <label class="form-label">Options <span class="text-danger">*</span></label>
+                            <div class="option-block">
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">A</span>
+                                    <input type="text" class="form-control" name="questions[${questionIndex}].options[0].text" placeholder="Option A" required>
+                                    <div class="input-group-text">
+                                        <input class="form-check-input" type="radio" name="questions[${questionIndex}].correctOption" value="0" required>
+                                    </div>
+                                    <button type="button" class="btn btn-outline-danger hidden" onclick="removeOption(this)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="option-block">
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text">B</span>
+                                    <input type="text" class="form-control" name="questions[${questionIndex}].options[1].text" placeholder="Option B" required>
+                                    <div class="input-group-text">
+                                        <input class="form-check-input" type="radio" name="questions[${questionIndex}].correctOption" value="1">
+                                    </div>
+                                    <button type="button" class="btn btn-outline-danger" onclick="removeOption(this)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addOption(this)">
+                                <i class="fas fa-plus me-1"></i> Add Option
+                            </button>
+                        </div>
+                    `;
+                    updateOptionButtons(specificFields.querySelector('.mcq-fields'));
+                } else if (type === 'TRUE_FALSE') {
+                    specificFields.innerHTML = `
+                        <div class="tf-fields mt-3">
+                            <label class="form-label">Correct Answer <span class="text-danger">*</span></label>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="questions[${questionIndex}].trueFalseAnswer" id="trueOption${questionIndex}" value="true" required>
+                                <label class="form-check-label" for="trueOption${questionIndex}">True</label>
+                            </div>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="questions[${questionIndex}].trueFalseAnswer" id="falseOption${questionIndex}" value="false">
+                                <label class="form-check-label" for="falseOption${questionIndex}">False</label>
+                            </div>
+                        </div>
+                    `;
+                } else if (type === 'SHORT_ANSWER' || type === 'ESSAY') {
+                    specificFields.innerHTML = `
+                        <div class="keyword-fields mt-3">
+                            <label class="form-label">Keywords <span class="text-danger">*</span></label>
+                            <div class="keyword-block">
+                                <div class="input-group mb-2">
+                                    <span class="input-group-text"><i class="fas fa-magic"></i></span>
+                                    <input type="text" class="form-control" name="questions[${questionIndex}].keywords[0].keyword" placeholder="e.g., variable" required>
+                                    <span class="input-group-text">Points</span>
+                                    <input type="number" class="form-control" name="questions[${questionIndex}].keywords[0].weight" min="1" value="1" required>
+                                    <button type="button" class="btn btn-outline-danger" onclick="removeKeyword(this)">
+                                        <i class="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-outline-primary btn-sm mt-2" onclick="addKeyword(this)">
+                                <i class="fas fa-plus me-1"></i> Add Keyword
+                            </button>
+                        </div>
+                    `;
+                    pointsField.disabled = true; // Points handled by keywords
+                }
+            };
+    
+            window.addOption = function(button) {
+                const mcqDiv = button.closest('.mcq-fields');
+                const questionIndex = mcqDiv.closest('.question-block').querySelector('textarea').name.split('[')[1].split(']')[0];
+                const optionBlocks = mcqDiv.querySelectorAll('.option-block');
+                const index = optionBlocks.length;
+                const label = String.fromCharCode(65 + index);
+    
+                const newOption = document.createElement('div');
+                newOption.className = 'option-block';
+                newOption.innerHTML = `
+                    <div class="input-group mb-2">
+                        <span class="input-group-text">${label}</span>
+                        <input type="text" class="form-control" name="questions[${questionIndex}].options[${index}].text" placeholder="Option ${label}" required>
+                        <div class="input-group-text">
+                            <input class="form-check-input" type="radio" name="questions[${questionIndex}].correctOption" value="${index}">
+                        </div>
+                        <button type="button" class="btn btn-outline-danger" onclick="removeOption(this)">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                mcqDiv.insertBefore(newOption, button);
+                updateOptionButtons(mcqDiv);
+            };
+    
+            window.removeOption = function(button) {
+                const mcqDiv = button.closest('.mcq-fields');
+                const optionBlock = button.closest('.option-block');
+                optionBlock.remove();
+                updateOptionButtons(mcqDiv);
+                renumberOptions(mcqDiv, mcqDiv.closest('.question-block').querySelector('textarea').name.split('[')[1].split(']')[0]);
+            };
+    
+            window.updateOptionButtons = function(mcqDiv) {
+                const options = mcqDiv.querySelectorAll('.option-block');
+                options.forEach((opt, index) => {
+                    const removeBtn = opt.querySelector('button');
+                    removeBtn.classList.toggle('hidden', options.length <= 2 && index < 2);
+                });
+            };
+    
+            window.renumberOptions = function(mcqDiv, questionIndex) {
+                const options = mcqDiv.querySelectorAll('.option-block');
+                options.forEach((opt, index) => {
+                    const label = String.fromCharCode(65 + index);
+                    opt.querySelector('.input-group-text').textContent = label;
+                    const textInput = opt.querySelector('input[type="text"]');
+                    const radioInput = opt.querySelector('input[type="radio"]');
+                    textInput.name = `questions[${questionIndex}].options[${index}].text`;
+                    textInput.placeholder = `Option ${label}`;
+                    radioInput.name = `questions[${questionIndex}].correctOption`;
+                    radioInput.value = `${index}`;
+                });
+            };
+    
+            window.addKeyword = function(button) {
+                const keywordDiv = button.closest('.keyword-fields');
+                const questionIndex = keywordDiv.closest('.question-block').querySelector('textarea').name.split('[')[1].split(']')[0];
+                const keywordBlocks = keywordDiv.querySelectorAll('.keyword-block');
+                const index = keywordBlocks.length;
+    
+                const newKeyword = document.createElement('div');
+                newKeyword.className = 'keyword-block';
+                newKeyword.innerHTML = `
+                    <div class="input-group mb-2">
+                        <span class="input-group-text"><i class="fas fa-magic"></i></span>
+                        <input type="text" class="form-control" name="questions[${questionIndex}].keywords[${index}].keyword" placeholder="e.g., variable" required>
+                        <span class="input-group-text">Points</span>
+                        <input type="number" class="form-control" name="questions[${questionIndex}].keywords[${index}].weight" min="1" value="1" required>
+                        <button type="button" class="btn btn-outline-danger" onclick="removeKeyword(this)">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                keywordDiv.insertBefore(newKeyword, button);
+            };
+    
+            window.removeKeyword = function(button) {
+                const keywordDiv = button.closest('.keyword-fields');
+                const keywordBlock = button.closest('.keyword-block');
+                keywordBlock.remove();
+                renumberKeywords(keywordDiv, keywordDiv.closest('.question-block').querySelector('textarea').name.split('[')[1].split(']')[0]);
+            };
+    
+            window.renumberKeywords = function(keywordDiv, questionIndex) {
+                const keywords = keywordDiv.querySelectorAll('.keyword-block');
+                keywords.forEach((keyword, index) => {
+                    const textInput = keyword.querySelector('input[type="text"]');
+                    const weightInput = keyword.querySelector('input[type="number"]');
+                    textInput.name = `questions[${questionIndex}].keywords[${index}].keyword`;
+                    weightInput.name = `questions[${questionIndex}].keywords[${index}].weight`;
+                });
+            };
         });
     </script>
 </body>

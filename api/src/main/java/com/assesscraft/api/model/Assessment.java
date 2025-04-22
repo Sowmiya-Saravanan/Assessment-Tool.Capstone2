@@ -7,7 +7,6 @@ import lombok.Setter;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-
 @Entity
 @Table(name = "assessments")
 @Getter
@@ -61,6 +60,9 @@ public class Assessment {
     private LocalDateTime createdAt = LocalDateTime.now();
 
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    @Column(nullable = false)
+    private String createdBy; // Add this field to track the creator
 
     @OneToMany(mappedBy = "assessment", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
