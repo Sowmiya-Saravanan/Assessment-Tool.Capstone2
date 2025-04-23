@@ -1,42 +1,48 @@
 package com.assesscraft.api.model;
 
-import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import lombok.Getter;
 import lombok.Setter;
-
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "invitations")
+@Table(name = "invitations", indexes = {
+    @Index(name = "idx_invitation_class_id", columnList = "class_id"),
+    @Index(name = "idx_invitation_created_by", columnList = "created_by")
+})
 @Getter
 @Setter
 public class Invitation {
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "invitation_id")
     private Long invitationId;
 
-    @Column(nullable = false)
-    private String email;
+    @Column(name = "recipient_email", nullable = false)
+    private String recipientEmail;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "class_id", nullable = false)
+    @JsonBackReference
     private Class classEntity;
-
-    @Column(nullable = false, unique = true)
-    private String classCode;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private InvitationStatus status = InvitationStatus.SENT; // Changed default to SENT
+    private InvitationStatus status;
 
-    @Column
-    private String temporaryPassword; // Add this for the generated password
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "created_by", nullable = false)
+    private User createdBy;
 
-    @Column(updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "student_id")
+    private Student student;
 
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false)
+    private LocalDateTime createdAt;
 
-    @Column
-    private LocalDateTime expirationDate; // Added for cleanup (optional but recommended)
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 }
