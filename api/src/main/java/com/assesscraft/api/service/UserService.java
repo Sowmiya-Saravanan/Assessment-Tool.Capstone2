@@ -1,14 +1,14 @@
 package com.assesscraft.api.service;
 
-import com.assesscraft.api.model.Role;
+import com.assesscraft.api.model.Class;
 import com.assesscraft.api.model.User;
+import com.assesscraft.api.model.UserRole;
 import com.assesscraft.api.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.Optional;
-
 
 @Service
 public class UserService {
@@ -21,7 +21,7 @@ public class UserService {
      * @param role The role to filter by.
      * @return List of users with the specified role.
      */
-    public List<User> findByRole(Role role) {
+    public List<User> findByRole(UserRole role) {
         return userRepository.findByRole(role);
     }
 
@@ -42,5 +42,14 @@ public class UserService {
     public List<User> findPendingStudentsByClassId(Long classId) {
         // This is a placeholder; implement with a pending_students table or logic
         return List.of(); // Return empty list for now
+    }
+
+    /**
+     * Find a user by their ID.
+     * @param userId The ID of the user to fetch.
+     * @return Optional containing the user, if found.
+     */
+    public Optional<User> findById(Long userId) {
+        return userRepository.findById(userId);
     }
 }

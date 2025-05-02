@@ -186,12 +186,12 @@
 
         <div id="dashboard-section" class="content-section active">
             <h3>Welcome to Your Dashboard</h3>
-            <p th:if="${dashboardData}">
-                Students: <span th:text="${dashboardData.studentCount}"></span><br>
-                Assessments: <span th:text="${dashboardData.assessmentCount}"></span><br>
-                Submissions: <span th:text="${dashboardData.submissionCount}"></span><br>
-                Pending Grading: <span th:text="${dashboardData.pendingGrading}"></span><br>
-                Upcoming Assessments: <span th:text="${dashboardData.upcomingAssessments}"></span>
+            <p th:if="${dashboardData != null}">
+                Students: <span th:text="${dashboardData.containsKey('studentCount') ? dashboardData.studentCount : '0'}"></span><br>
+                Assessments: <span th:text="${dashboardData.containsKey('assessmentCount') ? dashboardData.assessmentCount : '0'}"></span><br>
+                Submissions: <span th:text="${dashboardData.containsKey('submissionCount') ? dashboardData.submissionCount : '0'}"></span><br>
+                Pending Grading: <span th:text="${dashboardData.containsKey('pendingGrading') ? dashboardData.pendingGrading : '0'}"></span><br>
+                Upcoming Assessments: <span th:text="${dashboardData.containsKey('upcomingAssessments') ? dashboardData.upcomingAssessments : '0'}"></span>
             </p>
             <p th:unless="${dashboardData}">Click a sidebar option to get started.</p>
         </div>

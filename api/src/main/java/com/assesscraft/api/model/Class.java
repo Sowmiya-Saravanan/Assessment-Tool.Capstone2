@@ -36,6 +36,7 @@ public class Class {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
+    @JsonBackReference("user-classes") // Specify a unique name
     private User createdBy;
 
     @Column(name = "created_at", nullable = false)
@@ -45,7 +46,7 @@ public class Class {
     private LocalDateTime updatedAt;
 
     @ManyToMany(mappedBy = "classes")
-    @JsonBackReference
+    @JsonBackReference("assessment-classes") // Specify a unique name
     private List<Assessment> assessments = new ArrayList<>();
 
     @ManyToMany
@@ -56,4 +57,13 @@ public class Class {
     )
     @JsonManagedReference
     private List<Student> students = new ArrayList<>();
+
+    @OneToMany(mappedBy = "classEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonManagedReference
+    private List<Invitation> invitations = new ArrayList<>();
+
+    public void setCreatedBy(User orElseThrow) {
+        // TODO Auto-generated method stub
+        throw new UnsupportedOperationException("Unimplemented method 'setCreatedBy'");
+    }
 }

@@ -1,5 +1,6 @@
 package com.assesscraft.api.model;
 
+import com.fasterxml.jackson.annotation.JsonBackReference;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import lombok.Getter;
 import lombok.Setter;
@@ -49,6 +50,7 @@ public class Assessment {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by", nullable = false)
+    @JsonBackReference("user-assessments") // Added to match User.createdAssessments
     private User createdBy;
 
     @Column(name = "created_at", nullable = false)
@@ -67,6 +69,6 @@ public class Assessment {
         joinColumns = @JoinColumn(name = "assessment_id"),
         inverseJoinColumns = @JoinColumn(name = "class_id")
     )
-    @JsonManagedReference
+    @JsonManagedReference("assessment-classes") // Matches Class.assessments
     private List<Class> classes = new ArrayList<>();
 }

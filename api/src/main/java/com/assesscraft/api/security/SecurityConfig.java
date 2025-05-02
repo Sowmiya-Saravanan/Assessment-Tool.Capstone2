@@ -1,9 +1,7 @@
 package com.assesscraft.api.security;
 
-import com.assesscraft.api.security.CustomUserDetailsService;
 import com.assesscraft.api.service.JwtTokenService;
 import com.assesscraft.api.util.JwtAuthenticationFilter;
-
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,7 +33,7 @@ public class SecurityConfig {
         http
             .csrf(csrf -> csrf.disable())
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/auth/login").permitAll()
+                .requestMatchers("/api/auth/login", "/api/auth/register/educator").permitAll()
                 .requestMatchers("/api/**").authenticated()
                 .anyRequest().denyAll()
             )

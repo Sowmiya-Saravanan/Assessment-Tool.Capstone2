@@ -40,6 +40,9 @@ public class Invitation {
     @JoinColumn(name = "student_id")
     private Student student;
 
+    @Column(name = "temporary_password")
+    private String temporaryPassword;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 

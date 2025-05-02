@@ -3,6 +3,8 @@ package com.assesscraft.api.service;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -14,6 +16,8 @@ import java.util.Date;
 
 @Service
 public class JwtTokenService {
+
+    private static final Logger logger = LoggerFactory.getLogger(JwtTokenService.class);
 
     @Value("${jwt.secret}")
     private String jwtSecret;
@@ -31,13 +35,15 @@ public class JwtTokenService {
 
         Key signingKey = Keys.hmacShaKeyFor(jwtSecret.getBytes());
 
-        return Jwts.builder()
+        String token = Jwts.builder()
             .setSubject(email)
             .claim("role", role)
             .setIssuedAt(new Date())
             .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION_TIME))
             .signWith(signingKey)
             .compact();
+        logger.debug("Generated JWT for user: {}, role: {}", email, role);
+        return token;
     }
 
     public String getUsernameFromToken(String token) {
@@ -46,7 +52,9 @@ public class JwtTokenService {
             .build()
             .parseClaimsJws(token)
             .getBody();
-        return claims.getSubject();
+        String username = claims.getSubject();
+        logger.debug("Extracted username from token: {}", username);
+        return username;
     }
 
     public boolean validateToken(String token, UserDetails userDetails) {
@@ -58,10 +66,10 @@ public class JwtTokenService {
                 .getBody();
             String username = claims.getSubject();
             boolean isValid = username.equals(userDetails.getUsername()) && !claims.getExpiration().before(new Date());
-            System.out.println("Token validation for " + username + ": " + isValid);
+            logger.debug("Token validation for {}: {}", username, isValid);
             return isValid;
         } catch (Exception e) {
-            System.out.println("Token validation failed: " + e.getMessage());
+            logger.error("Token validation failed: {}", e.getMessage(), e);
             return false;
         }
     }
