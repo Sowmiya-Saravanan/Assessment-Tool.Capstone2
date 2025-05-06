@@ -47,7 +47,6 @@ public class LoginController {
     @GetMapping("/educator/login")
     public String showEducatorLogin(Model model) {
         logger.debug("Rendering educator login page");
-        // Pass any error from redirect to the model
         String error = (String) model.getAttribute("error");
         if (error != null) {
             model.addAttribute("error", error);
@@ -73,22 +72,29 @@ public class LoginController {
         HttpEntity<LoginRequest> entity = new HttpEntity<>(request, headers);
 
         try {
-            logger.debug("Attempting API call to: {}, Body: {}", apiBaseUrl + "/api/auth/login", request);
-            ResponseEntity<String> response = restTemplate.exchange(
+            logger.debug("Attempting API call to: {}, Body: email={}, password={}", 
+                apiBaseUrl + "/api/auth/login", request.getEmail(), request.getPassword());
+            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 apiBaseUrl + "/api/auth/login",
                 HttpMethod.POST,
                 entity,
-                String.class
+                new ParameterizedTypeReference<Map<String, Object>>() {}
             );
             logger.debug("API response - Status: {}, Body: {}", response.getStatusCode(), response.getBody());
-            String token = response.getBody();
-            if (token == null || token.isEmpty()) {
-                logger.warn("No valid token received for email: {}", username);
+
+            Map<String, Object> responseBody = response.getBody();
+            if (responseBody == null || !responseBody.containsKey("token") || !responseBody.containsKey("userId")) {
+                logger.warn("Invalid response for email: {}. Missing token or userId: {}", username, responseBody);
                 return "redirect:/educator/login?error=Invalid credentials or server issue";
             }
-            logger.info("Login successful for email: {}, Token: {}", username, token);
+
+            String token = (String) responseBody.get("token");
+            Long userId = ((Number) responseBody.get("userId")).longValue();
+
+            logger.info("Login successful for email: {}, Token: {}, UserId: {}", username, token, userId);
             session.setAttribute("token", token);
-            logger.debug("Token set in session, redirecting to /educator/dashboard");
+            session.setAttribute("userId", userId);
+            logger.debug("Token and userId set in session, redirecting to /educator/dashboard");
             return "redirect:/educator/dashboard";
         } catch (HttpClientErrorException e) {
             logger.error("API error for email: {}. Status: {}, Response: {}", username, e.getStatusCode(), e.getResponseBodyAsString());

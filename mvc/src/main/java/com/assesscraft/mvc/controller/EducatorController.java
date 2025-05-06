@@ -21,18 +21,18 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.assesscraft.mvc.model.AssessmentForm;
-import com.assesscraft.mvc.model.CategoryDto;
 import com.assesscraft.mvc.model.ClassEntity;
-import com.assesscraft.mvc.model.AssessmentDto;
+import com.assesscraft.mvc.service.EducatorDashboardService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import jakarta.servlet.http.HttpSession;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
+import java.util.UUID;
 
 @Controller
 @RequestMapping("/educator")
@@ -40,115 +40,43 @@ public class EducatorController {
 
     private static final Logger logger = LoggerFactory.getLogger(EducatorController.class);
 
+    private final EducatorDashboardService dashboardService;
     private final RestTemplate restTemplate;
     private final ObjectMapper objectMapper;
-    private final AssessmentController assessmentController;
 
     @Value("${app.api.base-url:http://localhost:8080}")
-    private String apiBaseUrl = "http://localhost:8080";
+    private String apiBaseUrl;
 
     @Autowired
-    public EducatorController(RestTemplate restTemplate, ObjectMapper objectMapper, AssessmentController assessmentController) {
+    public EducatorController(EducatorDashboardService dashboardService, RestTemplate restTemplate, ObjectMapper objectMapper) {
+        this.dashboardService = dashboardService;
         this.restTemplate = restTemplate;
         this.objectMapper = objectMapper;
-        this.assessmentController = assessmentController;
     }
 
     @GetMapping("/dashboard")
-    public String showEducatorDashboard(HttpSession session, Model model, @RequestParam(value = "fetchPending", required = false) Long classId) {
+    public String showEducatorDashboard(@RequestParam(value = "fetchPending", required = false) Long classId,
+                                       @RequestParam(required = false) String success,
+                                       Model model) {
+        if (model.containsAttribute("error")) {
+            return "educator-dashboard";
+        }
+        if (success != null) {
+            model.addAttribute("success", success);
+        }
+        return "educator-dashboard";
+    }
+
+    @ModelAttribute
+    public void addDashboardData(HttpSession session, Model model) {
         String token = (String) session.getAttribute("token");
-        if (token == null) {
-            logger.warn("No token found in session, redirecting to login");
-            return "redirect:/educator/login?error=Session expired";
-        }
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + token);
-        HttpEntity<String> entity = new HttpEntity<>(headers);
-
-        try {
-            fetchDashboardSummary(model, entity);
-            fetchDraftedClasses(model, entity);
-            fetchActiveClasses(model, entity);
-            assessmentController.fetchCategories(model, entity);
-            fetchClassesForAssessment(model, entity);
-            fetchAssessments(model, entity);
+        if (token != null) {
+            Map<String, Object> dashboardData = dashboardService.getDashboardData(token);
+            model.addAllAttributes(dashboardData);
             model.addAttribute("assessment", new AssessmentForm());
-            return "educator-dashboard";
-        } catch (Exception e) {
-            logger.error("Error fetching dashboard data: {}", e.getMessage(), e);
-            model.addAttribute("error", "Failed to load dashboard: " + e.getMessage());
-            model.addAttribute("assessment", new AssessmentForm());
-            return "educator-dashboard";
-        }
-    }
-
-    private void fetchDashboardSummary(Model model, HttpEntity<String> entity) {
-        logger.debug("Fetching dashboard summary from: {}", apiBaseUrl + "/api/data/educator-dashboard");
-        ResponseEntity<Map<String, Object>> dashboardResponse = restTemplate.exchange(
-            apiBaseUrl + "/api/data/educator-dashboard",
-            HttpMethod.GET,
-            entity,
-            new ParameterizedTypeReference<Map<String, Object>>() {}
-        );
-        model.addAttribute("dashboardData", dashboardResponse.getBody());
-    }
-
-    private void fetchDraftedClasses(Model model, HttpEntity<String> entity) {
-        logger.debug("Fetching drafted classes from: {}", apiBaseUrl + "/api/data/classes/draft");
-        ResponseEntity<List<Map<String, Object>>> classesResponse = restTemplate.exchange(
-            apiBaseUrl + "/api/data/classes/draft",
-            HttpMethod.GET,
-            entity,
-            new ParameterizedTypeReference<List<Map<String, Object>>>() {}
-        );
-        model.addAttribute("draftedClasses", classesResponse.getBody() != null ? classesResponse.getBody() : new ArrayList<>());
-    }
-
-    private void fetchActiveClasses(Model model, HttpEntity<String> entity) {
-        logger.debug("Fetching active classes from: {}", apiBaseUrl + "/api/data/classes/active");
-        ResponseEntity<List<Map<String, Object>>> activeClassesResponse = restTemplate.exchange(
-            apiBaseUrl + "/api/data/classes/active",
-            HttpMethod.GET,
-            entity,
-            new ParameterizedTypeReference<List<Map<String, Object>>>() {}
-        );
-        List<Map<String, Object>> activeClasses = activeClassesResponse.getBody();
-        logger.debug("Raw active classes from API: {}", activeClasses);
-        model.addAttribute("activeClasses", activeClasses != null ? activeClasses : new ArrayList<>());
-    }
-
-    private void fetchClassesForAssessment(Model model, HttpEntity<String> entity) {
-        logger.debug("Fetching classes for assessment from: {}", apiBaseUrl + "/api/data/classes/active");
-        ResponseEntity<List<Map<String, Object>>> classesResponse = restTemplate.exchange(
-            apiBaseUrl + "/api/data/classes/active",
-            HttpMethod.GET,
-            entity,
-            new ParameterizedTypeReference<List<Map<String, Object>>>() {}
-        );
-        List<Map<String, Object>> classesData = classesResponse.getBody();
-        model.addAttribute("classes", classesData != null ? classesData : new ArrayList<>());
-    }
-
-    private void fetchAssessments(Model model, HttpEntity<String> entity) {
-        logger.debug("Fetching assessments from: {}", apiBaseUrl + "/api/data/assessment");
-        ResponseEntity<List<AssessmentDto>> assessmentsResponse = restTemplate.exchange(
-            apiBaseUrl + "/api/data/assessment",
-            HttpMethod.GET,
-            entity,
-            new ParameterizedTypeReference<List<AssessmentDto>>() {}
-        );
-        if (assessmentsResponse.getStatusCode() == HttpStatus.OK) {
-            List<AssessmentDto> assessments = assessmentsResponse.getBody();
-            List<Map<String, Object>> assessmentMaps = assessments != null ? assessments.stream().map(assessment -> {
-                Map<String, Object> map = new HashMap<>();
-                map.put("assessmentId", assessment.getAssessmentId());
-                map.put("title", assessment.getTitle());
-                return map;
-            }).collect(Collectors.toList()) : new ArrayList<>();
-            model.addAttribute("assessments", assessmentMaps);
+            model.addAttribute("classEntity", new ClassEntity());
         } else {
-            model.addAttribute("error", "Failed to load assessments: " + assessmentsResponse.getStatusCode());
+            model.addAttribute("error", "Please log in to access the dashboard.");
         }
     }
 
@@ -187,34 +115,46 @@ public class EducatorController {
             logger.warn("No token found in session, redirecting to login");
             return "redirect:/educator/login?error=Session expired";
         }
-
-        if (classEntity.getClassName() == null || classEntity.getClassName().trim().isEmpty()) {
-            redirectAttributes.addFlashAttribute("error", "Class name is required");
-            return "redirect:/educator/dashboard";
-        }
-
+    
         HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("Authorization", "Bearer " + token);
-        HttpEntity<ClassEntity> entity = new HttpEntity<>(classEntity, headers);
-
+    
         try {
-            logger.debug("Creating class with data: {}", classEntity);
+            Map<String, Object> classPayload = new HashMap<>();
+            classPayload.put("className", classEntity.getClassName());
+            classPayload.put("description", classEntity.getDescription());
+            classPayload.put("classCode", UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            classPayload.put("status", "DRAFT");
+    
+            // Create UserDTO object
+            Map<String, Object> userDTO = new HashMap<>();
+            userDTO.put("userId", Long.valueOf(session.getAttribute("userId").toString()));
+            classPayload.put("createdBy", userDTO);
+    
+            classPayload.put("createdAt", LocalDateTime.now().toString());
+            classPayload.put("updatedAt", LocalDateTime.now().toString());
+    
+            // Send the Map directly as the body, let RestTemplate serialize it to JSON
+            HttpEntity<Map<String, Object>> request = new HttpEntity<>(classPayload, headers);
+    
+            logger.debug("Sending create class request to API: {}", classPayload);
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                apiBaseUrl + "/api/data/class",
+                apiBaseUrl + "/api/data/class/create-class",
                 HttpMethod.POST,
-                entity,
+                request,
                 new ParameterizedTypeReference<Map<String, Object>>() {}
             );
-
+    
             if (response.getStatusCode() == HttpStatus.CREATED) {
-                logger.info("Class created successfully");
                 redirectAttributes.addFlashAttribute("success", "Class created successfully!");
+                return "redirect:/educator/dashboard";
             } else {
                 redirectAttributes.addFlashAttribute("error", "Failed to create class: " + response.getStatusCode());
+                return "redirect:/educator/dashboard";
             }
-            return "redirect:/educator/dashboard";
         } catch (Exception e) {
-            logger.error("Error creating class: {}", e.getMessage(), e);
+            logger.error("Failed to create class: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to create class: " + e.getMessage());
             return "redirect:/educator/dashboard";
         }
@@ -230,10 +170,27 @@ public class EducatorController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
-        HttpEntity<List<Long>> entity = new HttpEntity<>(studentIds, headers);
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
         try {
             logger.debug("Assigning students to class {} with IDs: {}", classId, studentIds);
+
+            // Validate class ownership
+            ResponseEntity<Map> classResponse = restTemplate.exchange(
+                apiBaseUrl + "/api/data/class/" + classId,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                Map.class
+            );
+            Map classData = classResponse.getBody();
+            if (classData == null || classData.get("educator") == null || 
+                !((Map)classData.get("educator")).get("userId").equals(session.getAttribute("userId"))) {
+                redirectAttributes.addFlashAttribute("error", "Invalid or unauthorized class selection");
+                return "redirect:/educator/dashboard";
+            }
+
+            HttpEntity<List<Long>> entity = new HttpEntity<>(studentIds, headers); // Fixed: Send List<Long> directly
+
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 apiBaseUrl + "/api/data/class/" + classId + "/students",
                 HttpMethod.POST,
@@ -279,6 +236,21 @@ public class EducatorController {
 
         try {
             logger.debug("Bulk assigning students to class {} with file: {}", classId, file.getOriginalFilename());
+
+            // Validate class ownership
+            ResponseEntity<Map> classResponse = restTemplate.exchange(
+                apiBaseUrl + "/api/data/class/" + classId,
+                HttpMethod.GET,
+                new HttpEntity<>(new HttpHeaders(headers)),
+                Map.class
+            );
+            Map classData = classResponse.getBody();
+            if (classData == null || classData.get("educator") == null || 
+                !((Map)classData.get("educator")).get("userId").equals(session.getAttribute("userId"))) {
+                redirectAttributes.addFlashAttribute("error", "Invalid or unauthorized class selection");
+                return "redirect:/educator/dashboard";
+            }
+
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 apiBaseUrl + "/api/data/class/" + classId + "/bulk-students",
                 HttpMethod.POST,
@@ -322,10 +294,27 @@ public class EducatorController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
-        HttpEntity<List<Long>> entity = new HttpEntity<>(studentIds, headers);
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
         try {
             logger.debug("Approving students for class {} with IDs: {}", classId, studentIds);
+
+            // Validate class ownership
+            ResponseEntity<Map> classResponse = restTemplate.exchange(
+                apiBaseUrl + "/api/data/class/" + classId,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                Map.class
+            );
+            Map classData = classResponse.getBody();
+            if (classData == null || classData.get("educator") == null || 
+                !((Map)classData.get("educator")).get("userId").equals(session.getAttribute("userId"))) {
+                redirectAttributes.addFlashAttribute("error", "Invalid or unauthorized class selection");
+                return "redirect:/educator/dashboard";
+            }
+
+            HttpEntity<List<Long>> entity = new HttpEntity<>(studentIds, headers); // Fixed: Send List<Long> directly
+
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 apiBaseUrl + "/api/data/class/" + classId + "/approve-students",
                 HttpMethod.POST,
@@ -357,10 +346,29 @@ public class EducatorController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
-        HttpEntity<String> entity = new HttpEntity<>(email, headers);
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
         try {
             logger.debug("Adding student {} to class {}", email, classId);
+
+            // Validate class ownership
+            ResponseEntity<Map> classResponse = restTemplate.exchange(
+                apiBaseUrl + "/api/data/class/" + classId,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                Map.class
+            );
+            Map classData = classResponse.getBody();
+            if (classData == null || classData.get("educator") == null || 
+                !((Map)classData.get("educator")).get("userId").equals(session.getAttribute("userId"))) {
+                redirectAttributes.addFlashAttribute("error", "Invalid or unauthorized class selection");
+                return "redirect:/educator/dashboard";
+            }
+
+            Map<String, String> payload = new HashMap<>();
+            payload.put("email", email);
+            HttpEntity<Map<String, String>> entity = new HttpEntity<>(payload, headers); // Fixed: Send Map directly
+
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 apiBaseUrl + "/api/data/class/" + classId + "/add-student",
                 HttpMethod.POST,
@@ -392,10 +400,29 @@ public class EducatorController {
 
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + token);
-        HttpEntity<String> entity = new HttpEntity<>(email, headers);
+        headers.setContentType(MediaType.APPLICATION_JSON);
 
         try {
             logger.debug("Removing student {} from class {}", email, classId);
+
+            // Validate class ownership
+            ResponseEntity<Map> classResponse = restTemplate.exchange(
+                apiBaseUrl + "/api/data/class/" + classId,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                Map.class
+            );
+            Map classData = classResponse.getBody();
+            if (classData == null || classData.get("educator") == null || 
+                !((Map)classData.get("educator")).get("userId").equals(session.getAttribute("userId"))) {
+                redirectAttributes.addFlashAttribute("error", "Invalid or unauthorized class selection");
+                return "redirect:/educator/dashboard";
+            }
+
+            Map<String, String> payload = new HashMap<>();
+            payload.put("email", email);
+            HttpEntity<Map<String, String>> entity = new HttpEntity<>(payload, headers); // Fixed: Send Map directly
+
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 apiBaseUrl + "/api/data/class/" + classId + "/remove-student",
                 HttpMethod.POST,
@@ -459,6 +486,21 @@ public class EducatorController {
 
         try {
             logger.debug("Deleting class {}", classId);
+
+            // Validate class ownership
+            ResponseEntity<Map> classResponse = restTemplate.exchange(
+                apiBaseUrl + "/api/data/class/" + classId,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                Map.class
+            );
+            Map classData = classResponse.getBody();
+            if (classData == null || classData.get("educator") == null || 
+                !((Map)classData.get("educator")).get("userId").equals(session.getAttribute("userId"))) {
+                redirectAttributes.addFlashAttribute("error", "Invalid or unauthorized class selection");
+                return "redirect:/educator/dashboard";
+            }
+
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 apiBaseUrl + "/api/data/class/" + classId,
                 HttpMethod.DELETE,
@@ -494,6 +536,21 @@ public class EducatorController {
 
         try {
             logger.debug("Deleting assessment {}", assessmentId);
+
+            // Validate assessment ownership
+            ResponseEntity<Map> assessmentResponse = restTemplate.exchange(
+                apiBaseUrl + "/api/data/assessment/" + assessmentId,
+                HttpMethod.GET,
+                new HttpEntity<>(headers),
+                Map.class
+            );
+            Map assessmentData = assessmentResponse.getBody();
+            if (assessmentData == null || assessmentData.get("createdBy") == null || 
+                !((Map)assessmentData.get("createdBy")).get("userId").equals(session.getAttribute("userId"))) {
+                redirectAttributes.addFlashAttribute("error", "Invalid or unauthorized assessment selection");
+                return "redirect:/educator/dashboard";
+            }
+
             ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
                 apiBaseUrl + "/api/data/assessment/" + assessmentId,
                 HttpMethod.DELETE,
@@ -511,46 +568,6 @@ public class EducatorController {
         } catch (Exception e) {
             logger.error("Error deleting assessment: {}", e.getMessage(), e);
             redirectAttributes.addFlashAttribute("error", "Failed to delete assessment: " + e.getMessage());
-            return "redirect:/educator/dashboard";
-        }
-    }
-
-    @PostMapping("/create-category")
-    public String createCategory(@RequestParam String name, HttpSession session, RedirectAttributes redirectAttributes) {
-        String token = (String) session.getAttribute("token");
-        if (token == null) {
-            logger.warn("No token found in session, redirecting to login");
-            return "redirect:/educator/login?error=Session expired";
-        }
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + token);
-        headers.setContentType(MediaType.APPLICATION_JSON);
-
-        Map<String, Object> categoryPayload = new HashMap<>();
-        categoryPayload.put("name", name);
-
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(categoryPayload, headers);
-
-        try {
-            logger.debug("Creating category with name: {}", name);
-            ResponseEntity<Map<String, Object>> response = restTemplate.exchange(
-                apiBaseUrl + "/api/data/categories",
-                HttpMethod.POST,
-                entity,
-                new ParameterizedTypeReference<Map<String, Object>>() {}
-            );
-
-            if (response.getStatusCode() == HttpStatus.CREATED) {
-                logger.info("Category created successfully");
-                redirectAttributes.addFlashAttribute("success", "Category created successfully!");
-            } else {
-                redirectAttributes.addFlashAttribute("error", "Failed to create category: " + response.getStatusCode());
-            }
-            return "redirect:/educator/dashboard";
-        } catch (Exception e) {
-            logger.error("Error creating category: {}", e.getMessage(), e);
-            redirectAttributes.addFlashAttribute("error", "Failed to create category: " + e.getMessage());
             return "redirect:/educator/dashboard";
         }
     }

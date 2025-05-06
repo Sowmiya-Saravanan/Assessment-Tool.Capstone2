@@ -19,6 +19,7 @@ import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 @RestController
 @RequestMapping("/api")
 public class InviteController {
@@ -45,15 +46,16 @@ public class InviteController {
         public String[] getEmails() { return emails; }
         public void setEmails(String[] emails) { this.emails = emails; }
     }
-    private static final Logger logger = LoggerFactory.getLogger(InviteController.class); // Added logger initialization
+
+    private static final Logger logger = LoggerFactory.getLogger(InviteController.class);
 
     @PostMapping("/invitations")
     public ResponseEntity<?> sendInvites(@RequestBody InviteRequest request) {
         String userId = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         Class classEntity = classRepository.findById(request.getClassId())
                 .orElseThrow(() -> new IllegalArgumentException("Class not found"));
-        if (!classEntity.getEducator().getUserId().toString().equals(userId) &&
-                !classEntity.getEducator().getRole().name().equals("ADMIN")) {
+        if (!classEntity.getCreatedBy().getUserId().toString().equals(userId) &&
+                !classEntity.getCreatedBy().getRole().name().equals("ADMIN")) {
             return ResponseEntity.status(403).body("Not authorized to invite for this class");
         }
 
@@ -61,11 +63,10 @@ public class InviteController {
         for (String email : request.getEmails()) {
             Invitation invite = new Invitation();
             invite.setClassEntity(classEntity);
-            invite.setEmail(email);
-            invite.setClassCode(classEntity.getClassCode());
-            invite.setStatus(InvitationStatus.SENT); // Initial state, updated after email
+            invite.setRecipientEmail(email);
+            invite.setStatus(InvitationStatus.PENDING);
+            invite.setCreatedBy(classEntity.getCreatedBy());
             invite.setCreatedAt(LocalDateTime.now());
-            invite.setExpirationDate(LocalDateTime.now().plusDays(7)); // Set expiration
             invitationRepository.save(invite);
 
             SimpleMailMessage message = new SimpleMailMessage();
@@ -79,11 +80,12 @@ public class InviteController {
                     "\nOr join here: " + joinLink);
             try {
                 mailSender.send(message);
+                invite.setStatus(InvitationStatus.ACCEPTED);
+                invitationRepository.save(invite);
                 logger.info("Email sent successfully to: {}", email);
-                // Status remains SENT if email succeeds
             } catch (MailException e) {
                 failures.put(email, e.getMessage());
-                invite.setStatus(InvitationStatus.EXPIRED); // Mark as expired on failure
+                invite.setStatus(InvitationStatus.REJECTED);
                 invitationRepository.save(invite);
                 logger.error("Failed to send email to {}: {}", email, e.getMessage());
             }

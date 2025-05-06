@@ -1,5 +1,7 @@
 package com.assesscraft.api.model;
 
 public enum GradingMode {
-    AUTO, MANUAL, HYBRID
+    AUTO,
+    MANUAL,
+    HYBRID
 }
