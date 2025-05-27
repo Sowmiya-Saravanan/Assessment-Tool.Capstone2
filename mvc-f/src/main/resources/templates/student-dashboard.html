@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - AssessCraft</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary-color: #2c7873;
+            --secondary-color: #52de97;
+            --dark-color: #546e7a;
+            --light-color: #f9f9f9;
+            --highlight-color: #f7be16;
+        }
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%), url('https://www.transparenttextures.com/patterns/cubes.png');
+            background-blend-mode: overlay;
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+        }
+        .sidebar {
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            background: var(--primary-color);
+            padding-top: 20px;
+            transition: all 0.3s ease;
+        }
+        .sidebar a {
+            color: #ffffff;
+            padding: 15px 20px;
+            text-decoration: none;
+            display: block;
+            font-size: 1rem;
+        }
+        .sidebar a:hover {
+            background: var(--secondary-color);
+            color: var(--dark-color);
+        }
+        .content {
+            margin-left: 250px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+        .content-section {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            display: none;
+        }
+        .content-section.active {
+            display: block;
+        }
+        .form-control {
+            border-radius: 5px;
+            border: 1px solid #dcdcdc;
+            transition: all 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 5px rgba(44, 120, 115, 0.3);
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border: none;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+        .alert {
+            margin-top: 10px;
+        }
+        .class-list {
+            margin-top: 20px;
+        }
+        .class-item {
+            padding: 10px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .class-info {
+            flex-grow: 1;
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .content {
+                margin-left: 0;
+            }
+            .class-item {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <a href="#" id="dashboard-link"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        <a href="#" id="join-class-link"><i class="fas fa-plus-circle"></i> Join Class</a>
+        <a href="#" id="my-classes-link"><i class="fas fa-list"></i> My Classes</a>
+<form th:action="@{/student/logout}" method="post" style="display: inline;">
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <button type="submit" class="btn btn-link sidebar-link" style="color: #ffffff; padding: 15px 20px; text-decoration: none; display: block; font-size: 1rem; background: none; border: none; width: 100%; text-align: left;">
+            <i class="fas fa-sign-out-alt"></i> Logout
+        </button>
+    </form>    </div>
+    <div class="content">
+        <h2 class="mb-4">Student Dashboard</h2>
+        <!-- Flash attribute alerts -->
+        <div th:if="${success}" class="alert alert-success" th:text="${success}" role="alert"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}" role="alert"></div>
+
+        <!-- Dashboard Section -->
+        <div id="dashboard-section" class="content-section active">
+            <h3>Welcome to Your Dashboard</h3>
+            <p>Use the sidebar to join a class or view your enrolled classes.</p>
+        </div>
+
+        <!-- Join Class Section -->
+        <div id="join-class-section" class="content-section">
+            <h3>Join a Class</h3>
+            <form id="join-class-form" method="post">
+                <div class="mb-3">
+                    <label for="classCode" class="form-label">Class Code <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="classCode" name="classCode" required maxlength="8" pattern="[A-Z0-9]{8}" title="Class code must be an 8-character uppercase alphanumeric string">
+                    <div class="invalid-feedback">Please provide a valid 8-character uppercase class code.</div>
+                </div>
+                <button type="submit" class="btn btn-primary">Join Class</button>
+            </form>
+        </div>
+
+        <!-- My Classes Section -->
+        <div id="my-classes-section" class="content-section">
+            <h3>My Classes</h3>
+            <div id="classes-list">
+                <p>Loading classes...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:inline="javascript">
+        document.addEventListener('DOMContentLoaded', function() {
+            const sections = {
+                'dashboard-link': 'dashboard-section',
+                'join-class-link': 'join-class-section',
+                'my-classes-link': 'my-classes-section'
+            };
+
+            Object.entries(sections).forEach(([linkId, sectionId]) => {
+                const link = document.getElementById(linkId);
+                if (link) {
+                    link.addEventListener('click', function(e) {
+                        e.preventDefault();
+                        document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+                        document.getElementById(sectionId).classList.add('active');
+                    });
+                } else {
+                    console.warn(`Link with ID ${linkId} not found in DOM`);
+                }
+            });
+
+            // Form validation and submission for joining a class
+            const joinClassForm = document.getElementById('join-class-form');
+            joinClassForm.addEventListener('submit', function(event) {
+                event.preventDefault();
+                if (!joinClassForm.checkValidity()) {
+                    event.stopPropagation();
+                    joinClassForm.classList.add('was-validated');
+                    return;
+                }
+
+                const classCode = document.getElementById('classCode').value;
+                fetch('/api/student/join/class', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': 'Bearer ' + getJwtToken()
+                    },
+                    body: JSON.stringify({ classCode: classCode })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert('Successfully joined class!');
+                        document.getElementById('classCode').value = '';
+                        loadStudentClasses(); // Refresh the class list
+                    } else {
+                        alert('Failed to join class: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error joining class:', error);
+                    alert('An error occurred while joining the class.');
+                });
+            });
+
+            // Load student's classes
+            function loadStudentClasses() {
+                fetch('/api/student/classes', {
+                    headers: {
+                        'Authorization': 'Bearer ' + getJwtToken()
+                    }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    const classesList = document.getElementById('classes-list');
+                    classesList.innerHTML = '';
+                    if (data.status === 'success' && data.classes.length > 0) {
+                        data.classes.forEach(cls => {
+                            const classDiv = document.createElement('div');
+                            classDiv.className = 'class-item';
+                            classDiv.innerHTML = `
+                                <div class="class-info">
+                                    <h5>${cls.className}</h5>
+                                    <p>${cls.description || 'No description'}</p>
+                                    <small>Code: ${cls.classCode}</small>
+                                </div>
+                            `;
+                            classesList.appendChild(classDiv);
+                        });
+                    } else {
+                        classesList.innerHTML = '<p>No classes found.</p>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading classes:', error);
+                    document.getElementById('classes-list').innerHTML = '<p>Error loading classes.</p>';
+                });
+            }
+
+            // Get JWT token from cookie
+            function getJwtToken() {
+                const cookies = document.cookie.split(';');
+                for (let cookie of cookies) {
+                    const [name, value] = cookie.trim().split('=');
+                    if (name === 'jwtToken') {
+                        return value;
+                    }
+                }
+                return null;
+            }
+
+            // Load classes on page load
+            loadStudentClasses();
+        });
+    </script>
+</body>
+</html>

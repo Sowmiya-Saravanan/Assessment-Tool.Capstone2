@@ -2,6 +2,20 @@
     "configurations": [
         {
             "type": "java",
+            "name": "MvcApplication",
+            "request": "launch",
+            "mainClass": "com.project.mvc.MvcApplication",
+            "projectName": ""
+        },
+        {
+            "type": "java",
+            "name": "ApiApplication",
+            "request": "launch",
+            "mainClass": "com.project.api.ApiApplication",
+            "projectName": ""
+        },
+        {
+            "type": "java",
             "name": "PasswordHash",
             "request": "launch",
             "mainClass": "com.assesscraft.api.util.PasswordHash",
