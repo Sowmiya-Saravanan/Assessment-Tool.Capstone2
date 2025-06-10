@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - AssessCraft</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-color: #2c7873;
+            --secondary-color: #52de97;
+            --dark-color: #546e7a;
+            --light-color: #f9f9f9;
+            --error-color: #e74c3c;
+        }
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+        }
+        .sidebar {
+            width: 250px;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            background: var(--primary-color);
+            padding-top: 20px;
+            transition: width 0.3s ease;
+        }
+        .sidebar a, .sidebar button {
+            color: #ffffff;
+            padding: 15px 20px;
+            text-decoration: none;
+            display: block;
+            font-size: 1rem;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        .sidebar a:hover, .sidebar button:hover {
+            background: var(--secondary-color);
+            color: var(--dark-color);
+        }
+        .sidebar a.active {
+            background: var(--secondary-color);
+            color: var(--dark-color);
+            font-weight: bold;
+        }
+        .content {
+            margin-left: 250px;
+            padding: 30px;
+            transition: margin-left 0.3s ease;
+        }
+        .content-section {
+            background: #ffffff;
+            border-radius: 10px;
+            padding: 25px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            animation: fadeIn 0.5s ease-in-out;
+        }
+        .form-control {
+            border-radius: 5px;
+            border: 1px solid #dcdcdc;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 5px rgba(44, 120, 115, 0.3);
+        }
+        .btn-primary {
+            background-color: var(--primary-color);
+            border: none;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .btn-primary:hover {
+            background-color: var(--secondary-color);
+            transform: translateY(-2px);
+        }
+        .class-list {
+            margin-top: 20px;
+        }
+        .class-item {
+            padding: 15px;
+            border-bottom: 1px solid #eee;
+            transition: background 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .class-item:hover {
+            background: var(--light-color);
+        }
+        .class-item:last-child {
+            border-bottom: none;
+        }
+        .no-classes {
+            color: #777;
+            font-style: italic;
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 5px;
+        }
+        .error-message, .success-message {
+            font-size: 0.9rem;
+            margin-top: 5px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .error-message {
+            color: var(--error-color);
+            background: #f8d7da;
+        }
+        .success-message {
+            color: var(--primary-color);
+            background: #d4edda;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                width: 100%;
+                height: auto;
+                position: relative;
+            }
+            .content {
+                margin-left: 0;
+                padding: 15px;
+            }
+            .class-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <a href="#" data-section="dashboard-section" class="active"><i class="fas fa-tachometer-alt"></i> Dashboard</a>
+        <form th:action="@{/student/logout}" method="post" style="display: inline;">
+            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+            <button type="submit"><i class="fas fa-sign-out-alt"></i> Logout</button>
+        </form>
+    </div>
+
+    <div class="content">
+        <h2 class="mb-4">Student Dashboard</h2>
+        <div th:if="${success}" class="alert alert-success" th:text="${success}" role="alert"></div>
+        <div th:if="${error}" class="alert alert-danger" th:text="${error}" role="alert"></div>
+
+        <div id="dashboard-section" class="content-section">
+            <h3>Welcome, <span th:text="${studentEmail != null ? studentEmail : 'Student'}"/>!</h3>
+
+            <!-- Hidden field for JWT token -->
+            <input type="hidden" id="jwtToken" th:value="${jwtToken}" />
+            <input type="hidden" id="csrfToken" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+            <!-- Join Class Form -->
+            <div class="mb-4">
+                <h4>Join a Class</h4>
+                <form id="join-class-form" class="needs-validation" novalidate>
+                    <div class="mb-3">
+                        <label for="classCode" class="form-label">Class Code <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" id="classCode" required placeholder="Enter 8-character class code" maxlength="8" pattern="[A-Za-z0-9]{8}">
+                        <div class="invalid-feedback">Please enter a valid 8-character class code.</div>
+                        <div id="join-message" class="mt-2"></div>
+                    </div>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-plus me-1"></i> Join Class</button>
+                </form>
+            </div>
+
+            <!-- My Classes -->
+            <div class="mb-4">
+                <h4>My Classes</h4>
+                <div id="classes-container">
+                    <div th:if="${classes != null}">
+                        <div th:if="${#lists.isEmpty(classes)}" class="no-classes">
+                            <p>You are not enrolled in any classes yet.</p>
+                        </div>
+                        <div th:unless="${#lists.isEmpty(classes)}" class="class-list">
+                            <div th:each="class : ${classes}" class="class-item">
+                                <div>
+                                    <h5 th:text="${class.className}">Class Name</h5>
+                                    <p th:text="${class.description != null ? class.description : 'No description provided'}">Description</p>
+                                    <small>Class Code: <span th:text="${class.classCode}"></span></small>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-primary view-details-btn" th:attr="data-class-id=${class.classId}">
+                                        <i class="fas fa-eye"></i> View Details
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div th:if="${classes == null}" class="no-classes">
+                        <p>Unable to load classes. Please try again later.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Class Details Modal -->
+        <div class="modal fade" id="classDetailsModal" tabindex="-1" aria-labelledby="classDetailsModalLabel" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="classDetailsModalLabel">Class Details</h5>
+                        <button type="btn btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <h6>Class Name</h6>
+                        <p id="modal-class-name"></p>
+                        <h6>Description</h6>
+                        <p id="modal-class-description"></p>
+                        <h6>Assessments</h6>
+                        <ul id="modal-assessments" class="list-group"></ul>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Utility functions
+function getJwtToken() {
+        return document.getElementById('jwtToken').value || null;
+    }
+
+       function getCsrfToken() {
+        const csrfToken = document.getElementById('csrfToken').value || null;
+        console.log('CSRF Token:', csrfToken); // Debug CSRF token
+        return csrfToken;
+    }
+
+        function showMessage(elementId, message, isError = true) {
+        const element = document.getElementById(elementId);
+        element.innerHTML = message;
+        element.classList.remove('error-message', 'success-message');
+        element.classList.add(isError ? 'error-message' : 'success-message');
+        element.style.display = 'block';
+        setTimeout(() => {
+            element.style.display = 'none';
+        }, 5000);
+    }
+// Join class form submission
+    const joinClassForm = document.getElementById('join-class-form');
+    if (joinClassForm) {
+        console.log('Join class form found, attaching event listener');
+        joinClassForm.addEventListener('submit', function(event) {
+            event.preventDefault();
+            console.log('Join class form submitted');
+            if (!joinClassForm.checkValidity()) {
+                event.stopPropagation();
+                joinClassForm.classList.add('was-validated');
+                console.log('Form validation failed');
+                return;
+            }
+
+            const token = getJwtToken();
+            const csrfToken = getCsrfToken();
+            const classCode = document.getElementById('classCode').value.toUpperCase();
+
+            if (!token) {
+                showMessage('join-message', 'Authentication token missing. Redirecting to login...');
+                console.log('No JWT token, redirecting to login');
+                loginRedirect();
+                return;
+            }
+
+            if (!csrfToken) {
+                showMessage('join-message', 'CSRF token missing. Please refresh the page.');
+                console.log('No CSRF token');
+                return;
+            }
+
+            const submitButton = joinClassForm.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            submitButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Joining...';
+            console.log('Sending fetch request to join class with code:', classCode, 'CSRF Token:', csrfToken);
+
+            fetch('/api/student/join/class', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + token,
+                    'X-XSRF-TOKEN': csrfToken // Changed to match CookieCsrfTokenRepository
+                },
+                body: JSON.stringify({ classCode: classCode }),
+                credentials: 'include' // Ensure cookies are sent
+            })
+            .then(response => {
+                submitButton.disabled = false;
+                submitButton.innerHTML = '<i class="fas fa-plus me-1"></i> Join Class';
+                console.log('Fetch response status:', response.status);
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        if (response.status === 401) {
+                            showMessage('join-message', 'Session expired. Redirecting to login...');
+                            console.log('401 Unauthorized, redirecting to login');
+                            loginRedirect();
+                            return;
+                        }
+                        throw new Error(errorData.message || 'Failed to join class');
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('Fetch response data:', data);
+                if (data.status === 'success') {
+                    showMessage('join-message', data.message, false);
+                    document.getElementById('classCode').value = '';
+                    loadStudentClasses();
+                } else {
+                    showMessage('join-message', data.message || 'Failed to join class');
+                }
+            })
+            .catch(error => {
+                console.error('Error joining class:', error);
+                showMessage('join-message', error.message || 'An error occurred while joining the class.');
+            });
+        });
+    } else {
+        console.error('Join class form not found');
+    }
+
+        // Load student classes
+        function loadClasses() {
+            const token = getJwtToken();
+            if (!token) {
+                showMessage('join-message', 'Authentication token missing. Redirecting to login.');
+                loginRedirect();
+                return;
+            }
+
+            const classesContainer = document.getElementById('classes-container');
+            classesContainer.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+            fetch('/api/student/classes', {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        showMessage('join-message', 'Session expired. Redirecting to login...');
+                        loginRedirect();
+                        return;
+                    }
+                    throw new Error('Failed to fetch classes');
+                }
+                return response.json();
+            })
+            .then(data => {
+                classesContainer.innerHTML = '';
+                if (data.status === 'success') {
+                    if (!data.classes || data.classes.length === 0) {
+                        classesContainer.innerHTML = '<div class="no-classes"><p>You are not enrolled in any classes yet.</p></div>';
+                    } else {
+                        const classList = document.createElement('div');
+                        classList.className = 'class-list';
+                        data.classes.forEach(cls => {
+                            const classItem = document.createElement('div');
+                            classItem.className = 'class-item';
+                            classItem.innerHTML = `
+                                <div>
+                                    <h5>${cls.className || 'Unnamed Class'}</h5>
+                                    <p>${cls.description || 'No description provided'}</p>
+                                    <small>Class Code: ${cls.classCode || 'N/A'}</small>
+                                </div>
+                                <div>
+                                    <button class="btn btn-sm btn-primary view-details-btn" data-class-id="${cls.classId}">
+                                        <i class="fas fa-eye"></i> View Details
+                                    </button>
+                                </div>
+                            `;
+                            classList.appendChild(classItem);
+                        });
+                        classesContainer.appendChild(classList);
+                        attachViewDetailsListeners();
+                    }
+                } else {
+                    classesContainer.innerHTML = `<div class="no-classes"><p>Unable to load classes: ${data.message}</p></div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                classesContainer.innerHTML = '<div class="no-classes"><p>Unable to load classes. Please try again later.</p></div>';
+            });
+        }
+
+        // Redirect to login
+        function loginRedirect() {
+            setTimeout(() => {
+                window.location.href = '/student/login';
+            }, 2000);
+        }
+
+        // Fetch class details
+        function fetchClassDetails(classId) {
+            const token = getJwtToken();
+            if (!token) {
+                showMessage('join-message', 'Authentication token missing. Redirecting to login...');
+                loginRedirect();
+                return;
+            }
+
+            const modalBody = document.querySelector('#classDetailsModal .modal-body');
+            modalBody.innerHTML = '<div class="text-center"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
+
+            fetch(`/api/student/class-details?classId=${classId}`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': 'Bearer ' + token
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        showMessage('join-message', 'Session expired. Redirecting to login...');
+                        loginRedirect();
+                        return;
+                    }
+                    throw new Error('Failed to fetch class details');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    const details = data.classDetails;
+                    document.getElementById('modal-class-name').textContent = details.className || 'Unnamed Class';
+                    document.getElementById('modal-class-description').textContent = details.description || 'No description provided';
+                    const assessmentsList = document.getElementById('modal-assessments');
+                    assessmentsList.innerHTML = '';
+                    if (details.assessments && details.assessments.length > 0) {
+                        details.assessments.forEach(assessment => {
+                            const li = document.createElement('li');
+                            li.className = 'list-group-item';
+                            li.textContent = `${assessment.title} (${assessment.status})`;
+                            assessmentsList.appendChild(li);
+                        });
+                    } else {
+                        const li = document.createElement('li');
+                        li.className = 'list-group-item';
+                        li.textContent = 'No assessments assigned.';
+                        assessmentsList.appendChild(li);
+                    }
+                    const modal = new bootstrap.Modal(document.getElementById('classDetailsModal'));
+                    modal.show();
+                } else {
+                    showMessage('join-message', 'Failed to load class details: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showMessage('join-message', 'An error occurred while fetching class details.');
+            });
+        }
+
+        // Attach event listeners to view details buttons
+        function attachViewDetailsListeners() {
+            const viewDetailsButtons = document.querySelectorAll('.view-details-btn');
+            viewDetailsButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const classId = button.getAttribute('data-class-id');
+                    fetchClassDetails(classId);
+                });
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            loadClasses();
+            const joinClassForm = document.getElementById('join-class-form');
+if (joinClassForm) {
+        joinClassForm.classList.add('was-validated');
+    }        });
+    </script>
+</body>
+</html>
